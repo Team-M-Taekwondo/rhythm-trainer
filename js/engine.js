@@ -269,10 +269,9 @@
           await wait(GAP, player);
         }
 
-        // Joonbi, then a 1s beat before the count-in.
+        // Joonbi — the count-in starts immediately after.
         cb.onPhase("joonbi", "Joonbi");
         await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
-        await wait(GAP, player);
 
         // Count-in 1..5
         await countIn(player, cb, settings);
@@ -312,6 +311,8 @@
           for (let r = session.restSeconds; r > 0; r--) {
             if (player.cancelled) break;
             cb.onPhase("rest", "Rest", r);
+            // Beep the last 5 seconds so athletes get ready for the next poomsae.
+            if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
             await wait(1, player);
           }
         }
