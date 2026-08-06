@@ -134,6 +134,7 @@
     joonbi: {},
     sijak: {},
     baro: {},
+    swieo: {},
   };
 
   // Beat of silence between phases (seconds).
@@ -238,9 +239,10 @@
     await wait(1, player);
     cb.onPhase("baro", "Baro");
     await say(MT.CUES.baro.say, player, settings, STYLE.baro);
-    cb.onPhase("relax", "Relax");
-    MT.playRelax(MT.now() + 0.05, player.bus);
-    await wait(1.5, player);
+    if (stopped(player)) return;
+    await wait(0.5, player); // brief beat between Baro and Swieo
+    cb.onPhase("relax", "Swieo");
+    await say(MT.CUES.swieo.say, player, settings, STYLE.swieo);
     if (stopped(player)) return;
     await countIn(player, cb, settings);
   }

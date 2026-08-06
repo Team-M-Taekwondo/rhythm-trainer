@@ -213,7 +213,7 @@
     rest: "Rest",
     countdown: "Ready",
     switch: "Switch",
-    relax: "Relax",
+    relax: "Swieo",
   };
 
   function beltLabel(section, division) {

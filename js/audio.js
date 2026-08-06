@@ -98,36 +98,6 @@
     v(t, !!accent, bus || master);
   };
 
-  // Soft, low descending "at ease / relax" tone (~1.4s) played after Baro.
-  // Deep sine + a sub-octave layer so it reads as a calm, low cue.
-  MT.playRelax = function (t, bus) {
-    ensureContext();
-    const out = bus || master;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.5, t + 0.1);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
-    g.connect(out);
-    // main tone: glides down low
-    const o = ctx.createOscillator();
-    o.type = "sine";
-    o.frequency.setValueAtTime(196, t); // G3
-    o.frequency.exponentialRampToValueAtTime(88, t + 1.3); // ~F2
-    o.connect(g);
-    o.start(t);
-    o.stop(t + 1.5);
-    // sub-octave layer for extra warmth/depth
-    const sub = ctx.createOscillator();
-    sub.type = "sine";
-    sub.frequency.setValueAtTime(98, t);
-    sub.frequency.exponentialRampToValueAtTime(55, t + 1.3);
-    const sg = ctx.createGain();
-    sg.gain.value = 0.5;
-    sub.connect(sg).connect(g);
-    sub.start(t);
-    sub.stop(t + 1.5);
-  };
-
   // Pause / resume the whole audio timeline (used by the run screen's Pause).
   // Suspending freezes ctx.currentTime, so every rAF loop that polls MT.now()
   // holds in place until we resume.
