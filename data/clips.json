@@ -3,12 +3,119 @@
     {
       "section": "black",
       "division": "senior",
+      "poomsae": 1,
+      "file": "audio/black/senior/1.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 10,
+      "file": "audio/black/senior/10.mp3",
+      "tensions": [
+        {
+          "t": 9.3,
+          "sec": 8
+        },
+        {
+          "t": 21.9,
+          "sec": 5
+        },
+        {
+          "t": 29.8,
+          "sec": 8
+        },
+        {
+          "t": 41.2,
+          "sec": 8
+        },
+        {
+          "t": 54.8,
+          "sec": 5
+        },
+        {
+          "t": 62.7,
+          "sec": 8
+        }
+      ]
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 11,
+      "file": "audio/black/senior/11.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 3,
+      "file": "audio/black/senior/3.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 4,
+      "file": "audio/black/senior/4.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 5,
+      "file": "audio/black/senior/5.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
       "poomsae": 6,
       "file": "audio/black/senior/6.mp3",
       "tensions": [
         {
           "t": 15.1,
           "sec": 5
+        }
+      ]
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 7,
+      "file": "audio/black/senior/7.mp3",
+      "tensions": [
+        {
+          "t": 12,
+          "sec": 5
+        }
+      ]
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 8,
+      "file": "audio/black/senior/8.mp3",
+      "tensions": [
+        {
+          "t": 7.5,
+          "sec": 8
+        },
+        {
+          "t": 15.9,
+          "sec": 8
+        }
+      ]
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 9,
+      "file": "audio/black/senior/9.mp3",
+      "tensions": [
+        {
+          "t": 34.1,
+          "sec": 8
         }
       ]
     }
