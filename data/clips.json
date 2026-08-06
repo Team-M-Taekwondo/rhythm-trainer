@@ -1,11 +1,16 @@
 {
-  "_comment": "Poomsae audio shipped to the whole team. Each entry ties an audio file to a belt/division/poomsae, plus the tension (slow-count) markers Yuna counts over. Admin edits in the app; Long hands Claude the files + specs and Claude fills this in and commits.",
-  "_format": {
-    "section": "color | black",
-    "division": "'' for color; cadet | junior | senior | over30 for black",
-    "poomsae": "id 1-15 (1-8 Taegeuk, 9 Koryo, 10 Keumgang, 11 Taebaek, 12 Pyeongwon, 13 Sipjin, 14 Jitae, 15 Chonkwon)",
-    "file": "path to the audio file in the repo, e.g. audio/black/senior/9.mp3",
-    "tensions": "[{ t: seconds into clip, sec: 5 | 8 }] — where Yuna counts over the audio"
-  },
-  "clips": []
+  "clips": [
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 6,
+      "file": "audio/black/senior/6.mp3",
+      "tensions": [
+        {
+          "t": 15.1,
+          "sec": 5
+        }
+      ]
+    }
+  ]
 }
