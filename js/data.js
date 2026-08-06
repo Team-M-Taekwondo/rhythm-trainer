@@ -41,27 +41,31 @@
     { id: "black", label: "Black Belt" },
   ];
   MT.DIVISIONS = [
+    { id: "youth", label: "Youth" },
     { id: "cadet", label: "Cadet" },
     { id: "junior", label: "Junior" },
-    { id: "senior", label: "Senior" },
-    { id: "over30", label: "Over 30" },
+    { id: "u30over", label: "U30 + over" },
+    { id: "mixed", label: "Mixed" },
   ];
-  // Poomsae excluded from certain black-belt divisions (by id). Younger
-  // divisions perform fewer of the advanced forms.
-  //  12 Pyeongwon · 13 Sipjin · 14 Jitae · 15 Chonkwon
-  MT.DIVISION_EXCLUDE = {
-    cadet: [12, 13, 14, 15],
-    junior: [13, 14, 15],
-    // senior, over30: all poomsae
+  // Real divisions that hold their own clips (excludes the special "Mixed").
+  MT.CLIP_DIVISIONS = ["youth", "cadet", "junior", "u30over"];
+  // Allowed poomsae ids per black-belt division.
+  //  1-8 Taegeuk · 9 Koryo · 10 Keumgang · 11 Taebaek · 12 Pyeongwon
+  //  13 Sipjin · 14 Jitae · 15 Chonkwon
+  MT.DIVISION_POOMSAE = {
+    youth: [4, 5, 6, 7, 8, 9, 10],
+    cadet: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    junior: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    u30over: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   };
 
   // Available poomsae ids for a belt section (+ division for black belt).
-  // Color belt = Taegeuk 1–8; Black belt = all poomsae minus division limits.
+  // Color belt = Taegeuk 1–8; Black belt = the division's allowed list.
   MT.poomsaeIdsFor = function (section, division, forms) {
     const ids = (forms || []).map((f) => f.id);
     if (section === "color") return ids.filter((id) => id <= 8);
-    const excl = MT.DIVISION_EXCLUDE[division] || [];
-    return ids.filter((id) => excl.indexOf(id) === -1);
+    const allowed = MT.DIVISION_POOMSAE[division];
+    return allowed ? ids.filter((id) => allowed.indexOf(id) !== -1) : ids;
   };
 
   // Per-clip metadata (e.g. whether the clip already contains its own intro).
@@ -80,18 +84,6 @@
     } catch (e) {}
     all[key] = Object.assign({}, all[key], meta);
     localStorage.setItem(CLIPMETA_KEY, JSON.stringify(all));
-  };
-  // Tension markers for a clip: [{ t: seconds into clip, sec: 5|8 }].
-  // Yuna counts over the audio at these points during the drill.
-  MT.clipTensions = function (section, division, id) {
-    const key = MT.clipKey(section, division, id);
-    const meta = MT.getClipMeta(key);
-    // Admin's local marks (localStorage) win; otherwise use the repo's.
-    if (Object.prototype.hasOwnProperty.call(meta, "tensions")) return meta.tensions || [];
-    return (MT.repoTensions && MT.repoTensions(key)) || [];
-  };
-  MT.setClipTensions = function (section, division, id, arr) {
-    MT.setClipMeta(MT.clipKey(section, division, id), { tensions: arr });
   };
 
   // Approximate official movement counts — PLACEHOLDER rhythm.

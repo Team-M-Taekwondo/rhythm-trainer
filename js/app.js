@@ -65,13 +65,28 @@
     ).join("");
     $("#forms-division").value = formsDivision;
 
+    // Mixed mode: swap the normal poomsae panels for the rotation config.
+    const isMixed = formsSection === "black" && formsDivision === "mixed";
+    $("#panel-choose").hidden = isMixed;
+    $("#panel-rest").hidden = isMixed;
+    $("#mixed-config").hidden = !isMixed;
+    if (isMixed) {
+      if (!$("#mixed-divisions").children.length) {
+        $("#mixed-divisions").innerHTML = MT.CLIP_DIVISIONS.map((id) => {
+          const label = (MT.DIVISIONS.find((d) => d.id === id) || {}).label || id;
+          return `<label class="check-item"><input type="checkbox" value="${id}" checked /><span class="ci-name">${label}</span></label>`;
+        }).join("");
+      }
+      return;
+    }
+
     const secForms = sectionForms(formsSection, formsDivision);
     $("#forms-checklist").innerHTML = secForms
       .map(
         (f) => `
       <label class="check-item">
         <input type="checkbox" value="${f.id}" />
-        <span class="ci-name">${f.name}</span>
+        <span class="ci-name">${f.id}. ${f.name}</span>
         <span class="ci-meta">${f.movements} Pooms</span>
       </label>`
       )
@@ -108,6 +123,20 @@
 
   $("#start-forms").addEventListener("click", () => {
     MT.unlockAudio();
+
+    // Mixed rotation session.
+    if (formsSection === "black" && formsDivision === "mixed") {
+      const divisions = $$("#mixed-divisions input:checked").map((c) => c.value);
+      if (!divisions.length) return alert("Pick at least one division for the rotation.");
+      startRun({
+        kind: "mixed",
+        divisions,
+        rounds: Math.max(1, Number($("#mixed-rounds").value) || 1),
+        switchSeconds: Math.max(0, Number($("#mixed-switch").value) || 0),
+      });
+      return;
+    }
+
     const mode = $("#forms-mode .seg-btn.active").dataset.mode;
     let config;
     if (mode === "pick") {
@@ -131,7 +160,7 @@
     const items = MT.buildFormItems(config, MT.loadForms());
     startRun({
       items,
-      sets: Math.max(1, Number($("#forms-sets").value) || 1),
+      sets: 1,
       restSeconds: Math.max(0, Number($("#forms-rest").value) || 0),
     });
   });
@@ -183,6 +212,8 @@
     baro: "Baro",
     rest: "Rest",
     countdown: "Ready",
+    switch: "Switch",
+    relax: "Relax",
   };
 
   function beltLabel(section, division) {
@@ -235,13 +266,22 @@
           elCount.textContent = num;
           elMax.textContent = "seconds";
           elTitle.textContent = "Rest";
+        } else if (phase === "switch") {
+          elCount.textContent = num;
+          elMax.textContent = "switch";
+          elTitle.textContent = label + " up next";
         } else if (phase === "announce") {
           elCount.textContent = "";
           elMax.textContent = "";
           elTitle.textContent = label;
         } else if (phase === "go") {
           elCount.textContent = "1";
-        } else if (phase === "joonbi" || phase === "sijak" || phase === "baro") {
+        } else if (
+          phase === "joonbi" ||
+          phase === "sijak" ||
+          phase === "baro" ||
+          phase === "relax"
+        ) {
           elCount.textContent = "";
           elMax.textContent = "";
         }
@@ -304,9 +344,10 @@
       b.classList.toggle("active", b.dataset.section === editorSection)
     );
     $("#editor-division-wrap").hidden = editorSection !== "black";
-    $("#editor-division").innerHTML = MT.DIVISIONS.map(
-      (d) => `<option value="${d.id}">${d.label}</option>`
-    ).join("");
+    $("#editor-division").innerHTML = MT.DIVISIONS.filter((d) => d.id !== "mixed")
+      .map((d) => `<option value="${d.id}">${d.label}</option>`)
+      .join("");
+    if (editorDivision === "mixed") editorDivision = "youth";
     $("#editor-division").value = editorDivision;
 
     renderEditorPoomsaeList();
@@ -337,28 +378,6 @@
 
   /* ---- Audio clip (per section/division/poomsae) ---- */
   let clipPreviewSrc = null;
-  let clipPlayStart = 0;
-  function clipTensionsNow() {
-    return editorForm ? MT.clipTensions(editorSection, editorDiv(), editorForm.id) : [];
-  }
-  function renderClipTensions() {
-    const list = clipTensionsNow()
-      .slice()
-      .sort((a, b) => a.t - b.t);
-    $("#clip-tension-list").innerHTML = list.length
-      ? list
-          .map(
-            (m) =>
-              `<div class="clip-tension-item"><span>${m.sec}s tension @ ${m.t.toFixed(1)}s</span>` +
-              `<button class="btn ghost cts-del" data-t="${m.t}" data-sec="${m.sec}">Remove</button></div>`
-          )
-          .join("")
-      : `<p class="hint">No tension markers yet — play the clip and tap Mark.</p>`;
-  }
-  function setClipMarkButtons(on) {
-    $("#clip-mark5").disabled = !on;
-    $("#clip-mark8").disabled = !on;
-  }
   function stopClipPreview() {
     if (clipPreviewSrc) {
       try {
@@ -367,7 +386,6 @@
     }
     clipPreviewSrc = null;
     $("#clip-play").textContent = "Play";
-    setClipMarkButtons(false);
   }
   function updateClipUI() {
     const has = editorForm && MT.hasClip(editorSection, editorDiv(), editorForm.id);
@@ -380,8 +398,6 @@
       : "No clip yet — upload the poomsae audio to use it in the drill.";
     $("#clip-play").disabled = !has;
     $("#clip-delete").disabled = !has;
-    $("#clip-tensions").hidden = !has;
-    if (has) renderClipTensions();
     stopClipPreview();
   }
   $("#clip-file").addEventListener("change", async (e) => {
@@ -405,9 +421,7 @@
     const src = MT.playClip(editorSection, editorDiv(), editorForm.id, null);
     if (src) {
       clipPreviewSrc = src;
-      clipPlayStart = MT.now();
       $("#clip-play").textContent = "Stop";
-      setClipMarkButtons(true);
       src.onended = stopClipPreview;
     }
   });
@@ -416,25 +430,6 @@
       await MT.deleteClip(editorSection, editorDiv(), editorForm.id);
     }
     updateClipUI();
-  });
-  function addClipTension(sec) {
-    if (!clipPreviewSrc || !editorForm) return;
-    const t = Math.round(Math.max(0, MT.now() - clipPlayStart) * 10) / 10;
-    const arr = clipTensionsNow().slice();
-    arr.push({ t, sec });
-    MT.setClipTensions(editorSection, editorDiv(), editorForm.id, arr);
-    renderClipTensions();
-  }
-  $("#clip-mark5").addEventListener("click", () => addClipTension(5));
-  $("#clip-mark8").addEventListener("click", () => addClipTension(8));
-  $("#clip-tension-list").addEventListener("click", (e) => {
-    const btn = e.target.closest(".cts-del");
-    if (!btn || !editorForm) return;
-    const t = Number(btn.dataset.t),
-      sec = Number(btn.dataset.sec);
-    const arr = clipTensionsNow().filter((m) => !(m.t === t && m.sec === sec));
-    MT.setClipTensions(editorSection, editorDiv(), editorForm.id, arr);
-    renderClipTensions();
   });
 
   function playSoundSample(soundId) {
@@ -564,13 +559,7 @@
       parts.push(id + "." + ext);
       const file = parts.join("/");
       files.push({ name: file, data: new Uint8Array(await blob.arrayBuffer()) });
-      manifest.clips.push({
-        section,
-        division,
-        poomsae: id,
-        file,
-        tensions: MT.clipTensions(section, division, id),
-      });
+      manifest.clips.push({ section, division, poomsae: id, file });
     }
     files.push({
       name: "data/clips.json",

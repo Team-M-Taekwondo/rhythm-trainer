@@ -98,6 +98,22 @@
     v(t, !!accent, bus || master);
   };
 
+  // Soft descending "at ease / relax" tone (~1.3s) played after Baro.
+  MT.playRelax = function (t, bus) {
+    ensureContext();
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(330, t);
+    o.frequency.exponentialRampToValueAtTime(175, t + 1.2);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    o.connect(g).connect(bus || master);
+    o.start(t);
+    o.stop(t + 1.4);
+  };
+
   // A "bus" that a whole run routes through, so Stop can silence everything
   // instantly (including already-scheduled hits).
   MT.createBus = function () {
@@ -295,11 +311,7 @@
   };
 
   // Clips shipped in the repo (data/clips.json + audio files). This is how the
-  // whole team gets the audio + tension markers — no browser upload needed.
-  const REPO_TENSIONS = {};
-  MT.repoTensions = function (key) {
-    return REPO_TENSIONS[key] || [];
-  };
+  // whole team gets the audio — no browser upload needed.
   MT.loadRepoClips = async function () {
     ensureContext();
     let manifest;
@@ -313,7 +325,6 @@
     const list = (manifest && manifest.clips) || [];
     for (const c of list) {
       const k = clipKey(c.section, c.division || "", c.poomsae);
-      if (c.tensions) REPO_TENSIONS[k] = c.tensions;
       if (!c.file || CLIP_CACHE.has(k)) continue; // don't clobber a local upload
       try {
         const r = await fetch(c.file);

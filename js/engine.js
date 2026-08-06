@@ -126,22 +126,17 @@
   // Beat of silence between phases (seconds).
   const GAP = 1.0;
 
-  // Play the poomsae's real audio clip; resolves when it ends or is stopped.
-  // Yuna counts over the audio during the clip's tension markers, so the
-  // slow-count movements sound the same as in metronome mode.
+  // Play the poomsae's real audio clip (counting is baked into the audio);
+  // resolves when it ends or is stopped.
   function playClip(item, player, cb) {
     return new Promise((resolve) => {
       if (player.cancelled) return resolve();
-      const settings = MT.loadSettings();
       const src = MT.playClip(item.section, item.division, item.id, player.bus);
       if (!src) return resolve();
       player.clipSrc = src;
       const dur = src.buffer.duration;
       const startT = MT.now();
-      const tensions =
-        (MT.clipTensions && MT.clipTensions(item.section, item.division, item.id)) || [];
       let done = false;
-      let lastSpoken = "";
       const finish = () => {
         if (!done) {
           done = true;
@@ -157,31 +152,8 @@
           return finish();
         }
         const now = MT.now();
-        const ct = now - startT; // time into the clip
-        cb.onProgress(Math.min(1, ct / dur));
-
-        // Is a tension window active right now?
-        let m = null;
-        for (let i = 0; i < tensions.length; i++) {
-          const tm = tensions[i];
-          if (ct >= tm.t && ct < tm.t + tm.sec) {
-            m = tm;
-            m._i = i;
-            break;
-          }
-        }
-        if (m) {
-          const k = Math.min(m.sec, Math.floor(ct - m.t) + 1);
-          const key = m._i + ":" + k;
-          if (key !== lastSpoken) {
-            lastSpoken = key;
-            if (settings.voice) MT.speak(MT.KO_NUMBERS_8[k - 1], { rate: 1.0 });
-            if (cb.onTension) cb.onTension(k, m.sec, 0);
-          }
-        } else {
-          lastSpoken = "";
-          if (cb.onClip) cb.onClip(ct, dur);
-        }
+        cb.onProgress(Math.min(1, (now - startT) / dur));
+        if (cb.onClip) cb.onClip(now - startT, dur);
         if (now < startT + dur) requestAnimationFrame(tick);
       })();
     });
@@ -225,9 +197,96 @@
     }
   }
 
+  // One full poomsae: [announce] → Joonbi → count → Sijak → clip/metronome →
+  // Baro → relax → recovery count. Caller handles onItem and any rest.
+  async function runPoomsaeItem(item, player, cb, settings) {
+    if (item.announce) {
+      cb.onPhase("announce", item.name);
+      await sayName(item, player, settings);
+      await wait(GAP, player);
+    }
+    if (player.cancelled) return;
+    cb.onPhase("joonbi", "Joonbi");
+    await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+    await countIn(player, cb, settings);
+    if (player.cancelled) return;
+    cb.onPhase("sijak", "Sijak");
+    await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+    if (player.cancelled) return;
+    cb.onPhase("go", item.name);
+    if (item.section && MT.hasClip && MT.hasClip(item.section, item.division, item.id)) {
+      await playClip(item, player, cb);
+    } else {
+      await runCounts(item.counts, item.sound, player, cb, settings);
+    }
+    if (player.cancelled) return;
+    cb.onPhase("hold", "—");
+    await wait(1, player);
+    cb.onPhase("baro", "Baro");
+    await say(MT.CUES.baro.say, player, settings, STYLE.baro);
+    cb.onPhase("relax", "Relax");
+    MT.playRelax(MT.now() + 0.05, player.bus);
+    await wait(1.5, player);
+    if (player.cancelled) return;
+    await countIn(player, cb, settings);
+  }
+
+  // Switch time between Mixed rounds — counts down, beeps the last 5s.
+  async function switchTimer(seconds, nextLabel, player, cb) {
+    for (let r = seconds; r > 0; r--) {
+      if (player.cancelled) return;
+      cb.onPhase("switch", nextLabel, r);
+      if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
+      await wait(1, player);
+    }
+  }
+
+  // Mixed: N rounds, each round one division performs a random poomsae,
+  // rotating sequentially through the selected divisions, with a switch
+  // timer (beeps last 5s) between rounds.
+  async function runMixed(session, player, cb, settings) {
+    const forms = MT.loadForms();
+    const order = MT.CLIP_DIVISIONS.filter((id) => session.divisions.indexOf(id) !== -1);
+    if (!order.length) return;
+    const labelOf = (id) => (MT.DIVISIONS.find((d) => d.id === id) || {}).label || id;
+    for (let r = 0; r < session.rounds; r++) {
+      if (player.cancelled) return;
+      const div = order[r % order.length];
+      const ids = MT.poomsaeIdsFor("black", div, forms);
+      const f = forms.find((x) => x.id === ids[Math.floor(Math.random() * ids.length)]);
+      if (!f) continue;
+      const item = {
+        type: "form",
+        id: f.id,
+        name: f.name,
+        spoken: f.spoken || f.name,
+        sound: f.sound,
+        counts: f.counts,
+        announce: true,
+        section: "black",
+        division: div,
+      };
+      cb.onItem({
+        set: r + 1,
+        sets: session.rounds,
+        item: 1,
+        items: 1,
+        name: item.name,
+        section: "black",
+        division: div,
+      });
+      await runPoomsaeItem(item, player, cb, settings);
+      if (player.cancelled) return;
+      if (r < session.rounds - 1) {
+        await switchTimer(session.switchSeconds, labelOf(order[(r + 1) % order.length]), player, cb);
+      }
+    }
+  }
+
   // session = {
-  //   items: [{ type, name, sound, counts, announce, section, division }],
-  //   sets, restSeconds, kind: 'drill' | undefined
+  //   items: [...], sets, restSeconds,
+  //   kind: 'drill' | 'mixed' | undefined,
+  //   divisions, rounds, switchSeconds   // for 'mixed'
   // }
   MT.runSession = async function (session, cb) {
     const settings = MT.loadSettings();
@@ -235,8 +294,9 @@
     MT._current = player;
     MT.unlockAudio();
 
-    if (session.kind === "drill") {
-      await runDrill(session, player, cb, settings);
+    if (session.kind === "drill" || session.kind === "mixed") {
+      if (session.kind === "drill") await runDrill(session, player, cb, settings);
+      else await runMixed(session, player, cb, settings);
       const wc = player.cancelled;
       try {
         player.bus.disconnect();
@@ -262,48 +322,8 @@
           division: item.division,
         });
 
-        // Announce the form name, then a 1s beat before Joonbi.
-        if (item.announce) {
-          cb.onPhase("announce", item.name);
-          await sayName(item, player, settings);
-          await wait(GAP, player);
-        }
-
-        // Joonbi — the count-in starts immediately after.
-        cb.onPhase("joonbi", "Joonbi");
-        await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
-
-        // Count-in 1..5
-        await countIn(player, cb, settings);
+        await runPoomsaeItem(item, player, cb, settings);
         if (player.cancelled) break;
-
-        // Sijak — the poomsae starts immediately after.
-        cb.onPhase("sijak", "Sijak");
-        await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
-        if (player.cancelled) break;
-
-        // Play the real audio clip if one exists; otherwise the metronome.
-        cb.onPhase("go", item.name);
-        if (item.section && MT.hasClip && MT.hasClip(item.section, item.division, item.id)) {
-          await playClip(item, player, cb);
-        } else {
-          await runCounts(item.counts, item.sound, player, cb, settings);
-        }
-        if (player.cancelled) break;
-
-        // 1s pause after the last movement, then Baro
-        cb.onPhase("hold", "—");
-        await wait(1, player);
-        cb.onPhase("baro", "Baro");
-        await say(MT.CUES.baro.say, player, settings, STYLE.baro);
-
-        // Recovery count 1..5 back into ready stance — poomsae only,
-        // after a 0.5s beat. Drills don't get the recovery count.
-        if (item.type !== "drill") {
-          await wait(0.5, player);
-          await countIn(player, cb, settings);
-          if (player.cancelled) break;
-        }
 
         // Rest, unless this is the very last item of the very last set
         const isLast = s === session.sets - 1 && it === totalItems - 1;
