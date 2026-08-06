@@ -41,62 +41,85 @@
   function runCounts(counts, soundId, player, cb, settings) {
     return new Promise((resolve) => {
       if (stopped(player) || !counts.length) return resolve();
-      const startT = MT.now() + 0.15;
 
-      // Expand counts into a flat event list (tension counts → N sub-beats).
+      // Expand counts into a flat event list with RELATIVE times (rt from 0),
+      // so we can (re)schedule from any offset when the user scrubs.
       const events = [];
-      let acc = startT;
+      let acc = 0;
       counts.forEach((c) => {
         if (c.tension === 5 || c.tension === 8) {
           const N = c.tension;
           for (let k = 1; k <= N; k++) {
-            events.push({ t: acc, kind: "tension", n: c.n, k: k, N: N });
+            events.push({ rt: acc, kind: "tension", n: c.n, k: k, N: N });
             acc += 1.0; // one second per tension count
           }
-          // Preserve the "preset" time tapped beyond the count: the count's
-          // total duration = counting seconds + reset/preset before the next poom.
           acc += Math.max(0, (c.duration || N) - N);
         } else {
-          events.push({ t: acc, kind: "beat", n: c.n, accent: c.accent });
+          events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent });
           acc += Math.max(0.1, c.duration);
         }
       });
-      const endT = acc;
+      const total = acc; // full metronome duration in seconds
 
-      // Schedule every beat up front, routed through the run bus.
-      events.forEach((e) =>
-        MT.playSound(soundId, e.t, e.kind === "beat" ? e.accent : e.k === 1, player.bus)
-      );
-
-      // Schedule the spoken tension numbers (speech isn't sample-accurate, so
-      // fire via timers relative to now).
-      if (settings && settings.voice) {
-        events.forEach((e) => {
-          if (e.kind !== "tension") return;
-          const id = setTimeout(() => {
-            if (!player.cancelled) MT.speak(MT.KO_NUMBERS_8[e.k - 1], { rate: 1.0 });
-          }, Math.max(0, (e.t - MT.now()) * 1000));
-          player.timers.push(id);
-        });
-      }
-
+      let metroBus = null; // sub-bus so a seek can cancel scheduled beats
+      let startT = 0; // ctx time that maps to rt = 0 (shifts when seeking)
       let idx = -1;
+      let done = false;
+      const speechTimers = [];
+      const finish = () => {
+        if (done) return;
+        done = true;
+        player.seek = null;
+        if (metroBus) try { metroBus.disconnect(); } catch (e) {}
+        resolve();
+      };
+
+      // Schedule every beat/tension at or after `offset` seconds, starting ~now.
+      function scheduleFrom(offset) {
+        offset = Math.max(0, Math.min(total, offset));
+        if (metroBus) try { metroBus.disconnect(); } catch (e) {}
+        speechTimers.forEach((id) => clearTimeout(id));
+        speechTimers.length = 0;
+        metroBus = MT.createBus();
+        // Route through the run bus (not master) so Stop/Skip still silence it.
+        try { metroBus.disconnect(); } catch (e) {}
+        metroBus.connect(player.bus);
+        const t0 = MT.now() + 0.12;
+        startT = t0 - offset;
+        events.forEach((e) => {
+          if (e.rt < offset - 1e-6) return;
+          const at = startT + e.rt;
+          MT.playSound(soundId, at, e.kind === "beat" ? e.accent : e.k === 1, metroBus);
+          if (settings && settings.voice && e.kind === "tension") {
+            const id = setTimeout(() => {
+              if (!player.cancelled) MT.speak(MT.KO_NUMBERS_8[e.k - 1], { rate: 1.0 });
+            }, Math.max(0, (at - MT.now()) * 1000));
+            speechTimers.push(id);
+            player.timers.push(id);
+          }
+        });
+        idx = -1; // re-announce the count at the new position
+      }
+      scheduleFrom(0.15);
+      player.seek = (frac) => scheduleFrom(Math.max(0, Math.min(1, frac)) * total);
+
       function tick() {
-        if (stopped(player)) return resolve();
+        if (stopped(player)) return finish();
         const now = MT.now();
-        let cur = 0;
+        const rt = now - startT;
+        let cur = -1;
         for (let i = 0; i < events.length; i++) {
-          if (now >= events[i].t) cur = i;
+          if (rt >= events[i].rt - 1e-6) cur = i;
           else break;
         }
-        if (cur !== idx && now >= events[0].t) {
+        if (cur !== idx && cur >= 0) {
           idx = cur;
           const e = events[cur];
           if (e.kind === "tension") cb.onTension(e.k, e.N, e.n);
           else cb.onCount(e.n, counts.length);
         }
-        cb.onProgress(Math.min(1, (now - startT) / (endT - startT)));
-        if (now >= endT) return resolve();
+        cb.onProgress(Math.min(1, Math.max(0, rt / total)));
+        if (rt >= total) return finish();
         requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);
@@ -145,30 +168,43 @@
   function playClip(item, player, cb) {
     return new Promise((resolve) => {
       if (stopped(player)) return resolve();
-      const src = MT.playClip(item.section, item.division, item.id, player.bus);
-      if (!src) return resolve();
-      player.clipSrc = src;
-      const dur = src.buffer.duration;
-      const startT = MT.now();
+      const dur = MT.clipDuration(item.section, item.division, item.id);
+      if (!dur) return resolve();
+      let src = null;
+      let playStart = 0; // ctx time that maps to clip offset 0 (shifts on seek)
       let done = false;
       const finish = () => {
-        if (!done) {
-          done = true;
-          resolve();
-        }
+        if (done) return;
+        done = true;
+        player.seek = null;
+        resolve();
       };
-      src.onended = finish;
+      // (Re)start the clip from `offset` seconds. Web Audio can't seek a live
+      // source, so we stop the old one and start a fresh buffer at the offset.
+      function startAt(offset) {
+        offset = Math.max(0, Math.min(dur - 0.05, offset));
+        if (src) {
+          try { src.onended = null; src.stop(); } catch (e) {}
+        }
+        src = MT.playClipAt(item.section, item.division, item.id, player.bus, offset);
+        player.clipSrc = src;
+        playStart = MT.now() - offset;
+        if (src) src.onended = finish; // fires at the buffer's natural end
+      }
+      startAt(0);
+      if (!src) return resolve();
+      player.seek = (frac) => startAt(Math.max(0, Math.min(1, frac)) * dur);
+
       (function tick() {
         if (stopped(player)) {
-          try {
-            src.stop();
-          } catch (e) {}
+          try { src.stop(); } catch (e) {}
           return finish();
         }
-        const now = MT.now();
-        cb.onProgress(Math.min(1, (now - startT) / dur));
-        if (cb.onClip) cb.onClip(now - startT, dur);
-        if (now < startT + dur) requestAnimationFrame(tick);
+        const elapsed = Math.min(dur, Math.max(0, MT.now() - playStart));
+        cb.onProgress(elapsed / dur);
+        if (cb.onClip) cb.onClip(elapsed, dur);
+        if (elapsed >= dur - 0.02) return finish();
+        requestAnimationFrame(tick);
       })();
     });
   }
@@ -311,7 +347,7 @@
   // }
   MT.runSession = async function (session, cb) {
     const settings = MT.loadSettings();
-    const player = { cancelled: false, skip: false, paused: false, timers: [], bus: MT.createBus() };
+    const player = { cancelled: false, skip: false, paused: false, seek: null, timers: [], bus: MT.createBus() };
     MT._current = player;
     MT.unlockAudio();
 
@@ -418,6 +454,16 @@
   };
   MT.isPaused = function () {
     return !!(MT._current && MT._current.paused);
+  };
+
+  // Scrub the current poomsae/clip. `frac` is 0..1 of the current item.
+  // Only meaningful during the performance ("go") phase — canSeek() reflects that.
+  MT.canSeek = function () {
+    return !!(MT._current && MT._current.seek);
+  };
+  MT.seekCurrent = function (frac) {
+    const p = MT._current;
+    if (p && p.seek) p.seek(Math.max(0, Math.min(1, frac)));
   };
 
   // Skip the current poomsae / round / set and advance to the next one now.

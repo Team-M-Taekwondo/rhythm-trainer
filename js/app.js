@@ -241,7 +241,9 @@
     const elBelt = $("#run-belt");
     const elProg = $("#run-progress");
 
-    elProg.style.width = "0%";
+    scrubbing = false;
+    progressBar.classList.remove("scrubbable", "scrubbing");
+    setBar(0);
     elCount.textContent = "0";
     elMax.textContent = "";
 
@@ -256,7 +258,14 @@
       onPhase(phase, label, num) {
         document.body.dataset.phase = phase;
         elPhase.textContent = PHASE_LABELS[phase] || label;
-        elProg.style.width = "0%";
+        // The bar is scrubbable only during the performance ("go") phase.
+        const seekable = phase === "go";
+        progressBar.classList.toggle("scrubbable", seekable);
+        if (!seekable) {
+          scrubbing = false;
+          progressBar.classList.remove("scrubbing");
+        }
+        if (!scrubbing) setBar(0);
         if (phase === "count") {
           elCount.textContent = num;
           elMax.textContent = "count-in";
@@ -305,7 +314,7 @@
         elMax.textContent = "audio";
       },
       onProgress(p) {
-        elProg.style.width = Math.round(p * 100) + "%";
+        if (!scrubbing) setBar(p);
       },
       onDone() {
         elPhase.textContent = "Complete";
@@ -351,6 +360,41 @@
   $("#run-stop").addEventListener("click", exitRun);
   $("#run-exit").addEventListener("click", exitRun);
   $("#run-restart").addEventListener("click", restartRun);
+
+  /* -------- scrubbable progress bar (YouTube-style seek) -------- */
+  const progressBar = $("#run-progressbar");
+  const elThumb = $("#run-thumb");
+  let scrubbing = false;
+  function setBar(frac) {
+    frac = Math.max(0, Math.min(1, frac));
+    $("#run-progress").style.width = frac * 100 + "%";
+    if (elThumb) elThumb.style.left = frac * 100 + "%";
+  }
+  function fracFromPointer(e) {
+    const r = progressBar.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  }
+  progressBar.addEventListener("pointerdown", (e) => {
+    if (!MT.canSeek || !MT.canSeek()) return; // only seekable during the poomsae
+    scrubbing = true;
+    progressBar.classList.add("scrubbing");
+    try { progressBar.setPointerCapture(e.pointerId); } catch (_) {}
+    setBar(fracFromPointer(e));
+    e.preventDefault();
+  });
+  progressBar.addEventListener("pointermove", (e) => {
+    if (scrubbing) setBar(fracFromPointer(e));
+  });
+  function endScrub(e) {
+    if (!scrubbing) return;
+    scrubbing = false;
+    progressBar.classList.remove("scrubbing");
+    const f = fracFromPointer(e);
+    setBar(f);
+    MT.seekCurrent(f); // jump the clip/metronome to here (works live or paused)
+  }
+  progressBar.addEventListener("pointerup", endScrub);
+  progressBar.addEventListener("pointercancel", endScrub);
 
   /* -------------------- EDITOR -------------------- */
   let editorForm = null;

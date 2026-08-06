@@ -222,8 +222,26 @@ body.running { background: #000; }
 .run-countmax { color: var(--muted); font-size: clamp(16px, 4vw, 24px); }
 
 .run-bottom { display: flex; flex-direction: column; gap: 16px; }
-.progress { height: 8px; background: var(--panel); border-radius: 99px; overflow: hidden; }
-.progress-bar { height: 100%; width: 0; background: var(--gold); transition: width .08s linear; }
+/* Tall, transparent hit area around the visible 8px track so it's easy to grab. */
+.progress {
+  position: relative; height: 8px; background: var(--panel); border-radius: 99px;
+  padding: 14px 0; background-clip: content-box; margin: -14px 0;
+}
+.progress-bar {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  height: 8px; width: 0; background: var(--gold); border-radius: 99px; transition: width .08s linear;
+}
+/* Scrub thumb — hidden until the current phase is seekable. */
+.progress-thumb {
+  position: absolute; top: 50%; left: 0; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 0 4px rgba(231,177,10,.25);
+  transform: translate(-50%, -50%) scale(0); transition: transform .1s;
+  pointer-events: none;
+}
+.progress.scrubbable { cursor: pointer; touch-action: none; }
+.progress.scrubbable .progress-thumb { transform: translate(-50%, -50%) scale(1); }
+.progress.scrubbing .progress-bar { transition: none; }
+.progress.scrubbing .progress-thumb { transform: translate(-50%, -50%) scale(1.3); }
 .run-buttons { display: flex; gap: 12px; }
 .stop-btn, .restart-btn, .ctrl-btn {
   flex: 1; padding: 18px; font-size: 18px; font-weight: 800; border: none; border-radius: 14px; cursor: pointer;

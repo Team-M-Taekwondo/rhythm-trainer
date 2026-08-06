@@ -358,13 +358,19 @@
   // Start playing a stored clip through `bus`; returns the source node
   // (caller manages onended / stop), or null if there's no clip.
   MT.playClip = function (section, division, id, bus) {
+    return MT.playClipAt(section, division, id, bus, 0);
+  };
+
+  // Same as playClip but starts at `offset` seconds into the clip (used for
+  // scrubbing — Web Audio sources can't be seeked, so we restart at an offset).
+  MT.playClipAt = function (section, division, id, bus, offset) {
     ensureContext();
     const buf = CLIP_CACHE.get(clipKey(section, division, id));
     if (!buf) return null;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(bus || master);
-    src.start();
+    src.start(0, Math.max(0, Math.min(buf.duration, offset || 0)));
     return src;
   };
 

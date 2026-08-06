@@ -10,7 +10,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=49" />
+  <link rel="stylesheet" href="css/styles.css?v=50" />
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body>
@@ -180,7 +180,10 @@
       </div>
 
       <div class="run-bottom">
-        <div class="progress"><div id="run-progress" class="progress-bar"></div></div>
+        <div class="progress" id="run-progressbar">
+          <div id="run-progress" class="progress-bar"></div>
+          <div id="run-thumb" class="progress-thumb"></div>
+        </div>
         <div class="run-buttons">
           <button class="ctrl-btn" id="run-pause">Pause</button>
           <button class="ctrl-btn" id="run-skip">Skip &rsaquo;&rsaquo;</button>
@@ -274,9 +277,9 @@
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=49"></script>
-  <script src="js/audio.js?v=49"></script>
-  <script src="js/engine.js?v=49"></script>
-  <script src="js/app.js?v=49"></script>
+  <script src="js/data.js?v=50"></script>
+  <script src="js/audio.js?v=50"></script>
+  <script src="js/engine.js?v=50"></script>
+  <script src="js/app.js?v=50"></script>
 </body>
 </html>
