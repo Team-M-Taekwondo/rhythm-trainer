@@ -2,6 +2,69 @@
   "clips": [
     {
       "section": "black",
+      "division": "cadet",
+      "poomsae": 1,
+      "file": "audio/black/cadet/1.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "cadet",
+      "poomsae": 10,
+      "file": "audio/black/cadet/10.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "cadet",
+      "poomsae": 2,
+      "file": "audio/black/cadet/2.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "cadet",
+      "poomsae": 3,
+      "file": "audio/black/cadet/3.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "junior",
+      "poomsae": 1,
+      "file": "audio/black/junior/1.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "junior",
+      "poomsae": 10,
+      "file": "audio/black/junior/10.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "junior",
+      "poomsae": 12,
+      "file": "audio/black/junior/12.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "junior",
+      "poomsae": 2,
+      "file": "audio/black/junior/2.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "junior",
+      "poomsae": 3,
+      "file": "audio/black/junior/3.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
       "division": "senior",
       "poomsae": 1,
       "file": "audio/black/senior/1.mp3",
@@ -19,6 +82,27 @@
       "division": "senior",
       "poomsae": 11,
       "file": "audio/black/senior/11.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 12,
+      "file": "audio/black/senior/12.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 13,
+      "file": "audio/black/senior/13.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 14,
+      "file": "audio/black/senior/14.mp3",
       "tensions": []
     },
     {
@@ -91,6 +175,27 @@
       "division": "senior",
       "poomsae": 9,
       "file": "audio/black/senior/9.mp3",
+      "tensions": []
+    },
+    {
+      "section": "color",
+      "division": "",
+      "poomsae": 1,
+      "file": "audio/color/1.mp3",
+      "tensions": []
+    },
+    {
+      "section": "color",
+      "division": "",
+      "poomsae": 2,
+      "file": "audio/color/2.mp3",
+      "tensions": []
+    },
+    {
+      "section": "color",
+      "division": "",
+      "poomsae": 3,
+      "file": "audio/color/3.mp3",
       "tensions": []
     }
   ]
