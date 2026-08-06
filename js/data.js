@@ -44,19 +44,22 @@
     { id: "youth", label: "Youth" },
     { id: "cadet", label: "Cadet" },
     { id: "junior", label: "Junior" },
-    { id: "u30over", label: "U30 + over" },
+    { id: "u30", label: "U30" },
+    { id: "o30", label: "O30" },
     { id: "mixed", label: "Mixed" },
   ];
   // Real divisions that hold their own clips (excludes the special "Mixed").
-  MT.CLIP_DIVISIONS = ["youth", "cadet", "junior", "u30over"];
+  MT.CLIP_DIVISIONS = ["youth", "cadet", "junior", "u30", "o30"];
   // Allowed poomsae ids per black-belt division.
   //  1-8 Taegeuk · 9 Koryo · 10 Keumgang · 11 Taebaek · 12 Pyeongwon
   //  13 Sipjin · 14 Jitae · 15 Chonkwon
+  //  Only O30 performs Chonkwon (15); U30 stops at Jitae (14).
   MT.DIVISION_POOMSAE = {
     youth: [4, 5, 6, 7, 8, 9, 10],
     cadet: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     junior: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    u30over: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    u30: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+    o30: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   };
 
   // Available poomsae ids for a belt section (+ division for black belt).
