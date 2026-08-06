@@ -14,11 +14,24 @@
 
   MT._current = null; // the currently running player (for Stop)
 
+  // A stage should bail if the run was cancelled (Stop) or the current item
+  // was skipped (Skip).
+  function stopped(player) {
+    return player.cancelled || player.skip;
+  }
+
+  // Wait driven by the audio clock (not wall-clock) so Pause — which suspends
+  // the AudioContext and freezes MT.now() — freezes these waits too. Resolves
+  // early on Stop/Skip.
   function wait(seconds, player) {
     return new Promise((resolve) => {
-      if (player.cancelled) return resolve();
-      const id = setTimeout(resolve, seconds * 1000);
-      player.timers.push(id);
+      if (stopped(player)) return resolve();
+      const end = MT.now() + seconds;
+      (function poll() {
+        if (stopped(player)) return resolve();
+        if (MT.now() >= end) return resolve();
+        requestAnimationFrame(poll);
+      })();
     });
   }
 
@@ -27,7 +40,7 @@
   // (하나…) — one beat + spoken number per second — for slow-motion movements.
   function runCounts(counts, soundId, player, cb, settings) {
     return new Promise((resolve) => {
-      if (player.cancelled || !counts.length) return resolve();
+      if (stopped(player) || !counts.length) return resolve();
       const startT = MT.now() + 0.15;
 
       // Expand counts into a flat event list (tension counts → N sub-beats).
@@ -69,7 +82,7 @@
 
       let idx = -1;
       function tick() {
-        if (player.cancelled) return resolve();
+        if (stopped(player)) return resolve();
         const now = MT.now();
         let cur = 0;
         for (let i = 0; i < events.length; i++) {
@@ -93,7 +106,7 @@
   // Spoken count-in: numbers 1..5, one per beat.
   async function countIn(player, cb, settings) {
     for (let i = 0; i < 5; i++) {
-      if (player.cancelled) return;
+      if (stopped(player)) return;
       cb.onPhase("count", MT.KO_NUMBERS[i], i + 1);
       const started = MT.now();
       if (settings.voice) MT.speak(MT.KO_NUMBERS[i], { rate: 1.0 });
@@ -103,14 +116,14 @@
   }
 
   async function say(text, player, settings, opts) {
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     if (settings.voice) await MT.speak(text, opts);
     else await wait(0.6, player);
   }
 
   // Announce a form name — Yuna, using the Korean spelling for correct pronunciation.
   async function sayName(item, player, settings) {
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     if (settings.voice) await MT.speak(item.spoken || item.name);
     else await wait(0.6, player);
   }
@@ -130,7 +143,7 @@
   // resolves when it ends or is stopped.
   function playClip(item, player, cb) {
     return new Promise((resolve) => {
-      if (player.cancelled) return resolve();
+      if (stopped(player)) return resolve();
       const src = MT.playClip(item.section, item.division, item.id, player.bus);
       if (!src) return resolve();
       player.clipSrc = src;
@@ -145,7 +158,7 @@
       };
       src.onended = finish;
       (function tick() {
-        if (player.cancelled) {
+        if (stopped(player)) {
           try {
             src.stop();
           } catch (e) {}
@@ -163,23 +176,23 @@
      rest (beeps in the last 5s) → Sijak → next set. ---- */
   async function drillCountdown(player, cb, settings) {
     for (let n = 3; n >= 1; n--) {
-      if (player.cancelled) return;
+      if (stopped(player)) return;
       cb.onPhase("countdown", "", n);
       MT.playSound("beep", MT.now() + 0.02, true, player.bus);
       await wait(1, player);
     }
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     cb.onPhase("sijak", "Sijak");
     await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
   }
   async function drillRest(seconds, player, cb, settings) {
     for (let r = seconds; r > 0; r--) {
-      if (player.cancelled) return;
+      if (stopped(player)) return;
       cb.onPhase("rest", "Rest", r);
       if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
       await wait(1, player);
     }
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     cb.onPhase("sijak", "Sijak");
     await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
   }
@@ -187,6 +200,7 @@
     const drill = session.items[0];
     for (let s = 0; s < session.sets; s++) {
       if (player.cancelled) return;
+      player.skip = false; // each set starts fresh; a Skip advances to here
       cb.onItem({ set: s + 1, sets: session.sets, item: 1, items: 1, name: drill.name });
       if (s === 0) await drillCountdown(player, cb, settings);
       if (player.cancelled) return;
@@ -205,21 +219,21 @@
       await sayName(item, player, settings);
       await wait(GAP, player);
     }
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     cb.onPhase("joonbi", "Joonbi");
     await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
     await countIn(player, cb, settings);
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     cb.onPhase("sijak", "Sijak");
     await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     cb.onPhase("go", item.name);
     if (item.section && MT.hasClip && MT.hasClip(item.section, item.division, item.id)) {
       await playClip(item, player, cb);
     } else {
       await runCounts(item.counts, item.sound, player, cb, settings);
     }
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     cb.onPhase("hold", "—");
     await wait(1, player);
     cb.onPhase("baro", "Baro");
@@ -227,14 +241,14 @@
     cb.onPhase("relax", "Relax");
     MT.playRelax(MT.now() + 0.05, player.bus);
     await wait(1.5, player);
-    if (player.cancelled) return;
+    if (stopped(player)) return;
     await countIn(player, cb, settings);
   }
 
   // Switch time between Mixed rounds — counts down, beeps the last 5s.
   async function switchTimer(seconds, nextLabel, player, cb) {
     for (let r = seconds; r > 0; r--) {
-      if (player.cancelled) return;
+      if (stopped(player)) return;
       cb.onPhase("switch", nextLabel, r);
       if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
       await wait(1, player);
@@ -251,6 +265,7 @@
     const labelOf = (id) => (MT.DIVISIONS.find((d) => d.id === id) || {}).label || id;
     for (let r = 0; r < session.rounds; r++) {
       if (player.cancelled) return;
+      player.skip = false; // each round starts fresh; a Skip advances to here
       const div = order[r % order.length];
       const allIds = forms.map((x) => x.id);
       const ids = (MT.MIXED_POOMSAE[div] || MT.poomsaeIdsFor("black", div, forms)).filter(
@@ -293,7 +308,7 @@
   // }
   MT.runSession = async function (session, cb) {
     const settings = MT.loadSettings();
-    const player = { cancelled: false, timers: [], bus: MT.createBus() };
+    const player = { cancelled: false, skip: false, paused: false, timers: [], bus: MT.createBus() };
     MT._current = player;
     MT.unlockAudio();
 
@@ -314,6 +329,7 @@
     for (let s = 0; s < session.sets; s++) {
       for (let it = 0; it < totalItems; it++) {
         if (player.cancelled) break;
+        player.skip = false; // each poomsae starts fresh; a Skip advances to here
         const item = session.items[it];
         cb.onItem({
           set: s + 1,
@@ -332,7 +348,7 @@
         const isLast = s === session.sets - 1 && it === totalItems - 1;
         if (!isLast && session.restSeconds > 0) {
           for (let r = session.restSeconds; r > 0; r--) {
-            if (player.cancelled) break;
+            if (stopped(player)) break;
             cb.onPhase("rest", "Rest", r);
             // Beep the last 5 seconds so athletes get ready for the next poomsae.
             if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
@@ -366,7 +382,60 @@
     try {
       p.bus.disconnect();
     } catch (e) {}
+    // Leave the audio clock running for the next session even if Stop was hit
+    // while paused.
+    if (p.paused) {
+      p.paused = false;
+      MT.resumeAudio();
+    }
     MT._current = null;
+  };
+
+  // Pause the whole run: suspend the audio clock (freezes every timed stage)
+  // and pause any in-flight speech. Returns whether we're now paused.
+  MT.pauseSession = function () {
+    const p = MT._current;
+    if (!p || p.cancelled || p.paused) return !!(p && p.paused);
+    p.paused = true;
+    try {
+      if (window.speechSynthesis) window.speechSynthesis.pause();
+    } catch (e) {}
+    MT.suspendAudio();
+    return true;
+  };
+  MT.resumeSession = function () {
+    const p = MT._current;
+    if (!p || p.cancelled || !p.paused) return false;
+    p.paused = false;
+    MT.resumeAudio();
+    try {
+      if (window.speechSynthesis) window.speechSynthesis.resume();
+    } catch (e) {}
+    return false;
+  };
+  MT.isPaused = function () {
+    return !!(MT._current && MT._current.paused);
+  };
+
+  // Skip the current poomsae / round / set and advance to the next one now.
+  MT.skipSession = function () {
+    const p = MT._current;
+    if (!p || p.cancelled) return;
+    if (p.paused) MT.resumeSession(); // so the next item can actually play
+    p.skip = true;
+    // Silence whatever this item already scheduled: stop the clip and swap in a
+    // fresh bus (the old one — with its queued beats — is disconnected).
+    if (p.clipSrc) {
+      try {
+        p.clipSrc.stop();
+      } catch (e) {}
+      p.clipSrc = null;
+    }
+    try {
+      p.bus.disconnect();
+    } catch (e) {}
+    p.bus = MT.createBus();
+    MT.cancelSpeech();
   };
 
   // Expand a drill definition into a runnable item with a counts array.

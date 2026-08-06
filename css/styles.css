@@ -225,12 +225,15 @@ body.running { background: #000; }
 .progress { height: 8px; background: var(--panel); border-radius: 99px; overflow: hidden; }
 .progress-bar { height: 100%; width: 0; background: var(--gold); transition: width .08s linear; }
 .run-buttons { display: flex; gap: 12px; }
-.stop-btn, .restart-btn {
+.stop-btn, .restart-btn, .ctrl-btn {
   flex: 1; padding: 18px; font-size: 18px; font-weight: 800; border: none; border-radius: 14px; cursor: pointer;
 }
 .stop-btn { background: var(--stop); color: #fff; }
 .restart-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
-.restart-btn:active, .stop-btn:active { transform: scale(0.99); }
+.ctrl-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+/* Pause button glows gold while the session is paused. */
+.ctrl-btn.paused { background: var(--gold); color: #000; border-color: var(--gold); }
+.restart-btn:active, .stop-btn:active, .ctrl-btn:active { transform: scale(0.99); }
 
 /* phase-driven accent color on the big number */
 body[data-phase="sijak"] .run-count,

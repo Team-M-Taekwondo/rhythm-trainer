@@ -98,20 +98,46 @@
     v(t, !!accent, bus || master);
   };
 
-  // Soft descending "at ease / relax" tone (~1.3s) played after Baro.
+  // Soft, low descending "at ease / relax" tone (~1.4s) played after Baro.
+  // Deep sine + a sub-octave layer so it reads as a calm, low cue.
   MT.playRelax = function (t, bus) {
     ensureContext();
-    const o = ctx.createOscillator();
-    o.type = "sine";
-    o.frequency.setValueAtTime(330, t);
-    o.frequency.exponentialRampToValueAtTime(175, t + 1.2);
+    const out = bus || master;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.5, t + 0.08);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
-    o.connect(g).connect(bus || master);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    g.connect(out);
+    // main tone: glides down low
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(196, t); // G3
+    o.frequency.exponentialRampToValueAtTime(88, t + 1.3); // ~F2
+    o.connect(g);
     o.start(t);
-    o.stop(t + 1.4);
+    o.stop(t + 1.5);
+    // sub-octave layer for extra warmth/depth
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(98, t);
+    sub.frequency.exponentialRampToValueAtTime(55, t + 1.3);
+    const sg = ctx.createGain();
+    sg.gain.value = 0.5;
+    sub.connect(sg).connect(g);
+    sub.start(t);
+    sub.stop(t + 1.5);
+  };
+
+  // Pause / resume the whole audio timeline (used by the run screen's Pause).
+  // Suspending freezes ctx.currentTime, so every rAF loop that polls MT.now()
+  // holds in place until we resume.
+  MT.suspendAudio = function () {
+    ensureContext();
+    return ctx.state === "running" ? ctx.suspend() : Promise.resolve();
+  };
+  MT.resumeAudio = function () {
+    ensureContext();
+    return ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
   };
 
   // A "bus" that a whole run routes through, so Stop can silence everything

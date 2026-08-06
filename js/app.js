@@ -231,6 +231,7 @@
     currentSession = session;
     show("run");
     document.body.classList.add("running");
+    setPauseUI(false);
     const elCount = $("#run-count");
     const elMax = $("#run-countmax");
     const elPhase = $("#run-phase");
@@ -328,6 +329,25 @@
     // brief tick so the stopped run fully unwinds before restarting
     setTimeout(() => startRun(currentSession), 120);
   }
+  function setPauseUI(paused) {
+    const b = $("#run-pause");
+    if (!b) return;
+    b.textContent = paused ? "Resume" : "Pause";
+    b.classList.toggle("paused", paused);
+  }
+  $("#run-pause").addEventListener("click", () => {
+    if (MT.isPaused()) {
+      MT.resumeSession();
+      setPauseUI(false);
+    } else {
+      MT.pauseSession();
+      setPauseUI(MT.isPaused());
+    }
+  });
+  $("#run-skip").addEventListener("click", () => {
+    MT.skipSession(); // advances to the next poomsae/round/set (auto-resumes)
+    setPauseUI(false);
+  });
   $("#run-stop").addEventListener("click", exitRun);
   $("#run-exit").addEventListener("click", exitRun);
   $("#run-restart").addEventListener("click", restartRun);
