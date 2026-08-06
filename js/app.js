@@ -40,11 +40,10 @@
   });
 
   /* -------------------- helpers -------------------- */
-  function fillTempoSelect(sel, value, suffix) {
+  function fillTempoSelect(sel, value, suffix, tempos) {
+    const list = tempos || MT.TEMPOS;
     const suf = suffix != null ? suffix : " s";
-    sel.innerHTML = MT.TEMPOS.map(
-      (v) => `<option value="${v}">${v}${suf}</option>`
-    ).join("");
+    sel.innerHTML = list.map((v) => `<option value="${v}">${v}${suf}</option>`).join("");
     sel.value = value != null ? value : 1;
   }
   /* -------------------- FORMS builder -------------------- */
@@ -140,7 +139,7 @@
   /* -------------------- DRILL builder -------------------- */
   let drillSound = "woodblock";
   function renderDrillBuilder() {
-    fillTempoSelect($("#drill-tempo"), 2, "");
+    fillTempoSelect($("#drill-tempo"), 0.8, "", MT.DRILL_TEMPOS);
     renderDrillSoundChips();
   }
   function renderDrillSoundChips() {
@@ -166,6 +165,7 @@
       sound: drillSound,
     };
     startRun({
+      kind: "drill",
       items: [MT.drillToItem(drill)],
       sets: Math.max(1, Number($("#drill-sets").value) || 1),
       restSeconds: Math.max(0, Number($("#drill-rest").value) || 0),
@@ -182,6 +182,7 @@
     hold: "Hold",
     baro: "Baro",
     rest: "Rest",
+    countdown: "Ready",
   };
 
   function beltLabel(section, division) {
@@ -227,6 +228,9 @@
         if (phase === "count") {
           elCount.textContent = num;
           elMax.textContent = "count-in";
+        } else if (phase === "countdown") {
+          elCount.textContent = num;
+          elMax.textContent = "get ready";
         } else if (phase === "rest") {
           elCount.textContent = num;
           elMax.textContent = "seconds";

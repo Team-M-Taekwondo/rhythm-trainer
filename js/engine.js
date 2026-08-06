@@ -187,15 +187,64 @@
     });
   }
 
+  /* ---- Drill flow: no Joonbi/Baro. 3-beep countdown → Sijak → reps →
+     rest (beeps in the last 5s) → Sijak → next set. ---- */
+  async function drillCountdown(player, cb, settings) {
+    for (let n = 3; n >= 1; n--) {
+      if (player.cancelled) return;
+      cb.onPhase("countdown", "", n);
+      MT.playSound("beep", MT.now() + 0.02, true, player.bus);
+      await wait(1, player);
+    }
+    if (player.cancelled) return;
+    cb.onPhase("sijak", "Sijak");
+    await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+  }
+  async function drillRest(seconds, player, cb, settings) {
+    for (let r = seconds; r > 0; r--) {
+      if (player.cancelled) return;
+      cb.onPhase("rest", "Rest", r);
+      if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
+      await wait(1, player);
+    }
+    if (player.cancelled) return;
+    cb.onPhase("sijak", "Sijak");
+    await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+  }
+  async function runDrill(session, player, cb, settings) {
+    const drill = session.items[0];
+    for (let s = 0; s < session.sets; s++) {
+      if (player.cancelled) return;
+      cb.onItem({ set: s + 1, sets: session.sets, item: 1, items: 1, name: drill.name });
+      if (s === 0) await drillCountdown(player, cb, settings);
+      if (player.cancelled) return;
+      cb.onPhase("go", drill.name);
+      await runCounts(drill.counts, drill.sound, player, cb, settings);
+      if (player.cancelled) return;
+      if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings);
+    }
+  }
+
   // session = {
   //   items: [{ type, name, sound, counts, announce, section, division }],
-  //   sets, restSeconds
+  //   sets, restSeconds, kind: 'drill' | undefined
   // }
   MT.runSession = async function (session, cb) {
     const settings = MT.loadSettings();
     const player = { cancelled: false, timers: [], bus: MT.createBus() };
     MT._current = player;
     MT.unlockAudio();
+
+    if (session.kind === "drill") {
+      await runDrill(session, player, cb, settings);
+      const wc = player.cancelled;
+      try {
+        player.bus.disconnect();
+      } catch (e) {}
+      if (MT._current === player) MT._current = null;
+      if (!wc) cb.onDone();
+      return;
+    }
 
     const totalItems = session.items.length;
 

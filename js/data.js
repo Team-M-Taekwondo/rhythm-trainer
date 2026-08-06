@@ -8,6 +8,12 @@
 
   // Tempo grid the team uses, in seconds: 0.5 → 8 in half-second steps.
   MT.TEMPOS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8];
+  // Finer grid for drills: 0.1 → 8.0 in 0.1-second steps.
+  MT.DRILL_TEMPOS = (function () {
+    const a = [];
+    for (let i = 1; i <= 80; i++) a.push(i / 10);
+    return a;
+  })();
 
   // Korean voice cues. Native Korean numbers are used for counting in TKD.
   MT.CUES = {
