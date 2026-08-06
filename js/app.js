@@ -290,6 +290,12 @@
     relax: "Suh",
   };
 
+  // Taegeuk 1–8 get their number appended on the run screen, so color belts who
+  // don't know the Korean name can still recognize which poomsae it is.
+  function poomTitle(name, id) {
+    return id != null && id >= 1 && id <= 8 ? `${name} (${id})` : name;
+  }
+
   function beltLabel(section, division) {
     if (!section) return "";
     const sec = section === "black" ? "Black Belt" : "Color Belt";
@@ -326,7 +332,7 @@
         elSet.textContent = `Set ${info.set} / ${info.sets}`;
         elItem.textContent =
           info.items > 1 ? `${info.item} / ${info.items}` : "";
-        elTitle.textContent = info.name;
+        elTitle.textContent = poomTitle(info.name, info.id);
         elBelt.textContent = beltLabel(info.section, info.division);
       },
       onPhase(phase, label, num) {
@@ -357,7 +363,7 @@
         } else if (phase === "announce") {
           elCount.textContent = "";
           elMax.textContent = "";
-          elTitle.textContent = label;
+          elTitle.textContent = poomTitle(label, num);
         } else if (phase === "go") {
           elCount.textContent = "1";
         } else if (

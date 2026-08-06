@@ -252,7 +252,7 @@
   // Baro → relax → recovery count. Caller handles onItem and any rest.
   async function runPoomsaeItem(item, player, cb, settings) {
     if (item.announce) {
-      cb.onPhase("announce", item.name);
+      cb.onPhase("announce", item.name, item.id);
       await sayName(item, player, settings);
       await wait(GAP, player);
     }
@@ -329,6 +329,7 @@
         item: 1,
         items: 1,
         name: item.name,
+        id: item.id,
         section: "black",
         division: div,
       });
@@ -376,6 +377,7 @@
           item: it + 1,
           items: totalItems,
           name: item.name,
+          id: item.id,
           section: item.section,
           division: item.division,
         });
