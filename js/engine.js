@@ -240,11 +240,12 @@
     cb.onPhase("baro", "Baro");
     await say(MT.CUES.baro.say, player, settings, STYLE.baro);
     if (stopped(player)) return;
-    await wait(0.5, player); // brief beat between Baro and Swieo
-    cb.onPhase("relax", "Swieo");
-    await say(MT.CUES.swieo.say, player, settings, STYLE.swieo);
-    if (stopped(player)) return;
+    // Recovery 5-count after Baro, then the "at ease" (suh) command.
     await countIn(player, cb, settings);
+    if (stopped(player)) return;
+    await wait(0.5, player); // brief beat before the at-ease call
+    cb.onPhase("relax", "Suh");
+    await say(MT.CUES.swieo.say, player, settings, STYLE.swieo);
   }
 
   // Switch time between Mixed rounds — counts down, beeps the last 5s.

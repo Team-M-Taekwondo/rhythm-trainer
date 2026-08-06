@@ -20,7 +20,7 @@
     joonbi: { ko: "준비", say: "준비" },      // get ready
     sijak: { ko: "시작", say: "시작" },       // start
     baro: { ko: "바로", say: "바로" },         // return / finish
-    swieo: { ko: "쉬어", say: "쉬어" },        // at ease / relax (said after Baro)
+    swieo: { ko: "쉬어", say: "서" },          // at ease / relax — pronounced "suh", said after the recovery count
   };
   // hana, dul, set, net, daseot
   MT.KO_NUMBERS = ["하나", "둘", "셋", "넷", "다섯"];
