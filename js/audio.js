@@ -270,6 +270,13 @@
   MT.hasClip = function (section, division, id) {
     return CLIP_CACHE.has(clipKey(section, division, id));
   };
+  // All stored clip blobs (original uploaded files) for export.
+  MT.getAllClipBlobs = function () {
+    if (!window.indexedDB) return Promise.resolve([]);
+    return clipGetAll().then(({ keys, vals }) =>
+      keys.map((k, i) => ({ key: k, blob: vals[i] }))
+    );
+  };
   MT.clipDuration = function (section, division, id) {
     const b = CLIP_CACHE.get(clipKey(section, division, id));
     return b ? b.duration : 0;

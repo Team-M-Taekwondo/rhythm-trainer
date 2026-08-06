@@ -468,6 +468,129 @@
     startRun({ items: [item], sets: 1, restSeconds: 0 });
   });
 
+  /* -------------------- Export for GitHub (admin) --------------------
+     Packages the uploaded clips + tension config into a zip that mirrors
+     the repo (audio/… + data/clips.json). Unzip into the project, push. */
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(buf) {
+    let crc = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+  const _u16 = (n) => new Uint8Array([n & 255, (n >> 8) & 255]);
+  const _u32 = (n) =>
+    new Uint8Array([n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >> 24) & 255]);
+  function makeZip(files) {
+    const enc = new TextEncoder();
+    const pieces = [];
+    let offset = 0;
+    const push = (a) => {
+      pieces.push(a);
+      offset += a.length;
+    };
+    const records = [];
+    for (const f of files) {
+      const name = enc.encode(f.name);
+      const data = f.data;
+      const crc = crc32(data);
+      const localOffset = offset;
+      push(_u32(0x04034b50)); push(_u16(20)); push(_u16(0)); push(_u16(0));
+      push(_u16(0)); push(_u16(0)); push(_u32(crc)); push(_u32(data.length));
+      push(_u32(data.length)); push(_u16(name.length)); push(_u16(0)); push(name); push(data);
+      records.push({ name, crc, size: data.length, localOffset });
+    }
+    const cd = [];
+    let cdSize = 0;
+    const cpush = (a) => {
+      cd.push(a);
+      cdSize += a.length;
+    };
+    for (const r of records) {
+      cpush(_u32(0x02014b50)); cpush(_u16(20)); cpush(_u16(20)); cpush(_u16(0)); cpush(_u16(0));
+      cpush(_u16(0)); cpush(_u16(0)); cpush(_u32(r.crc)); cpush(_u32(r.size)); cpush(_u32(r.size));
+      cpush(_u16(r.name.length)); cpush(_u16(0)); cpush(_u16(0)); cpush(_u16(0)); cpush(_u16(0));
+      cpush(_u32(0)); cpush(_u32(r.localOffset)); cpush(r.name);
+    }
+    const cdOffset = offset;
+    const end = [
+      _u32(0x06054b50), _u16(0), _u16(0), _u16(records.length), _u16(records.length),
+      _u32(cdSize), _u32(cdOffset), _u16(0),
+    ];
+    return new Blob([...pieces, ...cd, ...end], { type: "application/zip" });
+  }
+  function extFor(type) {
+    type = type || "";
+    if (/mpeg|mp3/.test(type)) return "mp3";
+    if (/wav/.test(type)) return "wav";
+    if (/mp4|m4a|aac/.test(type)) return "m4a";
+    if (/ogg/.test(type)) return "ogg";
+    if (/webm/.test(type)) return "webm";
+    return "audio";
+  }
+  function downloadBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 1000);
+  }
+  async function buildExportZip() {
+    const clips = await MT.getAllClipBlobs();
+    const files = [];
+    const manifest = { clips: [] };
+    for (const { key, blob } of clips) {
+      const [section, division, idStr] = key.split("|");
+      const id = Number(idStr);
+      const ext = extFor(blob.type);
+      const parts = ["audio", section];
+      if (division) parts.push(division);
+      parts.push(id + "." + ext);
+      const file = parts.join("/");
+      files.push({ name: file, data: new Uint8Array(await blob.arrayBuffer()) });
+      manifest.clips.push({
+        section,
+        division,
+        poomsae: id,
+        file,
+        tensions: MT.clipTensions(section, division, id),
+      });
+    }
+    files.push({
+      name: "data/clips.json",
+      data: new TextEncoder().encode(JSON.stringify(manifest, null, 2) + "\n"),
+    });
+    return { blob: makeZip(files), count: clips.length, manifest };
+  }
+  async function exportForGitHub() {
+    $("#export-status").textContent = "Packaging…";
+    try {
+      const { blob, count } = await buildExportZip();
+      if (!count) {
+        $("#export-status").textContent = "No clips uploaded yet — nothing to export.";
+        return;
+      }
+      downloadBlob(blob, "mteam-rhythm-data.zip");
+      $("#export-status").textContent =
+        "Exported " + count + " clip(s) → mteam-rhythm-data.zip. Unzip into the project folder, then push.";
+    } catch (e) {
+      $("#export-status").textContent = "Export failed: " + e.message;
+    }
+  }
+  if ($("#export-github")) $("#export-github").addEventListener("click", exportForGitHub);
+
   /* -------------------- SETTINGS -------------------- */
   function renderSettings() {
     settings = MT.loadSettings();

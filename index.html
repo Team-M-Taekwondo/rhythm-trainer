@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0d0d0f" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=38" />
+  <link rel="stylesheet" href="css/styles.css?v=39" />
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body>
@@ -250,13 +250,20 @@
         <button class="btn" id="set-testvoice">Test voice</button>
         <p class="hint" id="voice-hint">Uses the device's built-in Korean speech. <b>Biggest quality boost:</b> install the enhanced Korean voice — on iPhone/iPad/Mac, Settings → Accessibility → Spoken Content → Voices → Korean → download <b>Yuna</b>, then pick it above.</p>
       </div>
+
+      <div class="panel">
+        <h2>Publish to team</h2>
+        <p class="hint">Packages all your uploaded clips + tension markers into a zip that mirrors the repo. Unzip it into the project folder, then push — and the team gets the update.</p>
+        <button class="btn" id="export-github">Export data (.zip)</button>
+        <p class="hint" id="export-status"></p>
+      </div>
     </section>
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=38"></script>
-  <script src="js/audio.js?v=38"></script>
-  <script src="js/engine.js?v=38"></script>
-  <script src="js/app.js?v=38"></script>
+  <script src="js/data.js?v=39"></script>
+  <script src="js/audio.js?v=39"></script>
+  <script src="js/engine.js?v=39"></script>
+  <script src="js/app.js?v=39"></script>
 </body>
 </html>
