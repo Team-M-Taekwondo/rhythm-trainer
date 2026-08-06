@@ -98,6 +98,31 @@
     v(t, !!accent, bus || master);
   };
 
+  // High-pitched "digital countdown" blip for the last-5-seconds get-ready
+  // beeps (rest between poomsae, Mixed switch, drill rest/countdown). Much
+  // higher than the metronome beep so it cuts through; the final beep (isFinal,
+  // the "1" before Go) is higher, louder and a touch longer.
+  MT.playCountdownBeep = function (t, isFinal, bus) {
+    ensureContext();
+    const out = bus || master;
+    const freq = isFinal ? 2640 : 1900;
+    const dur = isFinal ? 0.15 : 0.08;
+    const peak = isFinal ? 0.95 : 0.6;
+    const o = ctx.createOscillator();
+    o.type = "square"; // square → crisp, electronic timer character
+    o.frequency.setValueAtTime(freq, t);
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass"; // tame the square's harsh upper harmonics
+    filt.frequency.value = isFinal ? 5400 : 4200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(filt).connect(g).connect(out);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  };
+
   // Pause / resume the whole audio timeline (used by the run screen's Pause).
   // Suspending freezes ctx.currentTime, so every rAF loop that polls MT.now()
   // holds in place until we resume.

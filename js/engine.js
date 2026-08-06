@@ -179,7 +179,7 @@
     for (let n = 3; n >= 1; n--) {
       if (stopped(player)) return;
       cb.onPhase("countdown", "", n);
-      MT.playSound("beep", MT.now() + 0.02, true, player.bus);
+      MT.playCountdownBeep(MT.now() + 0.02, n === 1, player.bus);
       await wait(1, player);
     }
     if (stopped(player)) return;
@@ -190,7 +190,7 @@
     for (let r = seconds; r > 0; r--) {
       if (stopped(player)) return;
       cb.onPhase("rest", "Rest", r);
-      if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
+      if (r <= 5) MT.playCountdownBeep(MT.now() + 0.02, r === 1, player.bus);
       await wait(1, player);
     }
     if (stopped(player)) return;
@@ -253,7 +253,7 @@
     for (let r = seconds; r > 0; r--) {
       if (stopped(player)) return;
       cb.onPhase("switch", nextLabel, r);
-      if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
+      if (r <= 5) MT.playCountdownBeep(MT.now() + 0.02, r === 1, player.bus);
       await wait(1, player);
     }
   }
@@ -353,8 +353,8 @@
           for (let r = session.restSeconds; r > 0; r--) {
             if (stopped(player)) break;
             cb.onPhase("rest", "Rest", r);
-            // Beep the last 5 seconds so athletes get ready for the next poomsae.
-            if (r <= 5) MT.playSound("beep", MT.now() + 0.02, false, player.bus);
+            // Digital countdown the last 5 seconds so athletes get ready for the next poomsae.
+            if (r <= 5) MT.playCountdownBeep(MT.now() + 0.02, r === 1, player.bus);
             await wait(1, player);
           }
         }
