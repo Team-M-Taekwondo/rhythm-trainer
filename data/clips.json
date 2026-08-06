@@ -12,29 +12,27 @@
       "division": "senior",
       "poomsae": 10,
       "file": "audio/black/senior/10.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 11,
+      "file": "audio/black/senior/11.mp3",
+      "tensions": []
+    },
+    {
+      "section": "black",
+      "division": "senior",
+      "poomsae": 15,
+      "file": "audio/black/senior/15.mp3",
       "tensions": [
         {
-          "t": 9.3,
-          "sec": 8
-        },
-        {
-          "t": 21.9,
+          "t": 1.1,
           "sec": 5
         },
         {
-          "t": 29.8,
-          "sec": 8
-        },
-        {
-          "t": 41.2,
-          "sec": 8
-        },
-        {
-          "t": 54.8,
-          "sec": 5
-        },
-        {
-          "t": 62.7,
+          "t": 9.6,
           "sec": 8
         }
       ]
@@ -42,8 +40,8 @@
     {
       "section": "black",
       "division": "senior",
-      "poomsae": 11,
-      "file": "audio/black/senior/11.mp3",
+      "poomsae": 2,
+      "file": "audio/black/senior/2.mp3",
       "tensions": []
     },
     {
@@ -72,52 +70,28 @@
       "division": "senior",
       "poomsae": 6,
       "file": "audio/black/senior/6.mp3",
-      "tensions": [
-        {
-          "t": 15.1,
-          "sec": 5
-        }
-      ]
+      "tensions": []
     },
     {
       "section": "black",
       "division": "senior",
       "poomsae": 7,
       "file": "audio/black/senior/7.mp3",
-      "tensions": [
-        {
-          "t": 12,
-          "sec": 5
-        }
-      ]
+      "tensions": []
     },
     {
       "section": "black",
       "division": "senior",
       "poomsae": 8,
       "file": "audio/black/senior/8.mp3",
-      "tensions": [
-        {
-          "t": 7.5,
-          "sec": 8
-        },
-        {
-          "t": 15.9,
-          "sec": 8
-        }
-      ]
+      "tensions": []
     },
     {
       "section": "black",
       "division": "senior",
       "poomsae": 9,
       "file": "audio/black/senior/9.mp3",
-      "tensions": [
-        {
-          "t": 34.1,
-          "sec": 8
-        }
-      ]
+      "tensions": []
     }
   ]
 }
