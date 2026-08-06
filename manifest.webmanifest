@@ -1,0 +1,14 @@
+{
+  "name": "MTEAM Tempo Trainer",
+  "short_name": "MTEAM Tempo",
+  "description": "Taekwondo poomsae & drill tempo trainer with Korean voice cues.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d0f",
+  "theme_color": "#0d0d0f",
+  "icons": [
+    { "src": "assets/logo-light.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

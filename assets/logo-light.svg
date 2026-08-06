@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" role="img" aria-label="MTEAM">
+  <!-- Placeholder logo — replace with the real MTEAM brushstroke mark.
+       White fill for the dark UI. -->
+  <g fill="#ffffff">
+    <!-- musical-note style accent mark -->
+    <path d="M40 26c4 0 7 3 7 7v58a20 20 0 1 1-12-18V40l-12 4v-9l17-9z"/>
+    <circle cx="16" cy="118" r="6"/>
+  </g>
+  <text x="86" y="112" font-family="Arial Black, Arial, sans-serif" font-weight="900"
+        font-size="96" letter-spacing="2" fill="#ffffff">MTEAM</text>
+</svg>

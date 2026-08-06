@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d0d0f" />
+  <title>MTEAM Tempo Trainer</title>
+  <link rel="stylesheet" href="css/styles.css?v=38" />
+  <link rel="manifest" href="manifest.webmanifest" />
+</head>
+<body>
+  <div id="app">
+    <!-- ================= HOME ================= -->
+    <section class="screen active" data-screen="home">
+      <header class="brand">
+        <img src="assets/logo1.JPG" alt="MTEAM" class="logo"
+             onerror="this.onerror=null;this.src='assets/logo-light.svg';this.classList.add('logo-fallback');" />
+        <p class="tagline">Tempo &amp; Rhythm Trainer</p>
+      </header>
+
+      <div class="home-grid">
+        <button class="card big" data-goto="build-forms">
+          <span class="card-kicker">Poomsae</span>
+          <span class="card-title">Select Poomsae</span>
+          <span class="card-sub">Run 1&ndash;15 poomsae with their own rhythm, in sets, or randomized</span>
+        </button>
+        <button class="card big" data-goto="build-drill">
+          <span class="card-kicker">Drill</span>
+          <span class="card-title">Kicks, Punches, &amp; Blocks</span>
+          <span class="card-sub">N reps at one tempo &mdash; e.g. 20 kicks at 2s</span>
+        </button>
+        <button class="card" data-goto="editor">
+          <span class="card-title">Rhythm Editor</span>
+          <span class="card-sub">Calibrate each poomsae's tempo</span>
+        </button>
+        <button class="card" data-goto="settings">
+          <span class="card-title">Settings</span>
+          <span class="card-sub">Voice, sounds, counts</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================= BUILD: FORMS ================= -->
+    <section class="screen" data-screen="build-forms">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Select Poomsae</h1>
+      </div>
+
+      <div class="panel">
+        <h2>Belt</h2>
+        <div class="seg" id="forms-section">
+          <button class="seg-btn active" data-section="color">Color Belt</button>
+          <button class="seg-btn" data-section="black">Black Belt</button>
+        </div>
+        <label class="field" id="forms-division-wrap" hidden>
+          <span>Division</span>
+          <select id="forms-division"></select>
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>1 &middot; Choose poomsae</h2>
+        <div class="seg" id="forms-mode">
+          <button class="seg-btn active" data-mode="pick">Pick manually</button>
+          <button class="seg-btn" data-mode="random">Random from range</button>
+        </div>
+
+        <div id="forms-pick" class="mode-block">
+          <div id="forms-checklist" class="checklist"></div>
+        </div>
+
+        <div id="forms-random" class="mode-block hidden">
+          <label class="field">
+            <span>From poomsae #</span>
+            <select id="rand-from"></select>
+          </label>
+          <label class="field">
+            <span>To poomsae #</span>
+            <select id="rand-to"></select>
+          </label>
+          <label class="field">
+            <span>How many to draw</span>
+            <input type="number" id="rand-count" min="1" max="15" value="5" />
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="rand-norepeat" checked />
+            <span>No repeats until the pool is used up</span>
+          </label>
+          <p class="hint">The poomsae name is announced out loud before each one.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>2 &middot; Sets &amp; rest</h2>
+        <label class="field">
+          <span>Number of sets (rounds)</span>
+          <input type="number" id="forms-sets" min="1" max="20" value="1" />
+        </label>
+        <label class="field">
+          <span>Rest between poomsae (seconds)</span>
+          <input type="number" id="forms-rest" min="0" max="120" value="10" />
+        </label>
+      </div>
+
+      <button class="start-btn" id="start-forms">Start Session</button>
+    </section>
+
+    <!-- ================= BUILD: DRILL ================= -->
+    <section class="screen" data-screen="build-drill">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Kicks, Punches, &amp; Blocks</h1>
+      </div>
+
+      <div class="panel">
+        <label class="field">
+          <span>Reps per set</span>
+          <input type="number" id="drill-reps" min="1" max="200" value="20" />
+        </label>
+        <label class="field">
+          <span>Tempo per rep (seconds)</span>
+          <select id="drill-tempo"></select>
+        </label>
+        <div class="field">
+          <span>Sound (tap a chip to hear it)</span>
+          <div class="sound-chips" id="drill-sound-chips"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Sets &amp; rest</h2>
+        <label class="field">
+          <span>Number of sets</span>
+          <input type="number" id="drill-sets" min="1" max="20" value="3" />
+        </label>
+        <label class="field">
+          <span>Rest between sets (seconds)</span>
+          <input type="number" id="drill-rest" min="0" max="120" value="15" />
+        </label>
+      </div>
+
+      <button class="start-btn" id="start-drill">Start Drill</button>
+    </section>
+
+    <!-- ================= RUN ================= -->
+    <section class="screen run" data-screen="run">
+      <div class="run-top">
+        <button class="icon-btn ghost" id="run-exit">&times;</button>
+        <div class="run-meta">
+          <span id="run-belt"></span>
+          <span id="run-setinfo">Set 1 / 1</span>
+          <span id="run-iteminfo">Poomsae 1 / 5</span>
+        </div>
+      </div>
+
+      <div class="run-center">
+        <div id="run-phase" class="run-phase">Get Ready</div>
+        <div id="run-title" class="run-title">&mdash;</div>
+        <div id="run-count" class="run-count">0</div>
+        <div id="run-countmax" class="run-countmax"></div>
+      </div>
+
+      <div class="run-bottom">
+        <div class="progress"><div id="run-progress" class="progress-bar"></div></div>
+        <div class="run-buttons">
+          <button class="restart-btn" id="run-restart">Restart</button>
+          <button class="stop-btn" id="run-stop">Stop</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EDITOR ================= -->
+    <section class="screen" data-screen="editor">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Rhythm Editor</h1>
+      </div>
+      <div class="panel">
+        <div class="seg" id="editor-section">
+          <button class="seg-btn active" data-section="color">Color Belt</button>
+          <button class="seg-btn" data-section="black">Black Belt</button>
+        </div>
+        <label class="field" id="editor-division-wrap" hidden>
+          <span>Division</span>
+          <select id="editor-division"></select>
+        </label>
+        <label class="field">
+          <span>Poomsae</span>
+          <select id="editor-form"></select>
+        </label>
+      </div>
+
+      <div class="panel" id="clip-panel">
+        <h2>Audio clip</h2>
+        <p class="hint">Upload the edited audio for this poomsae (for this belt/division). The drill plays this <b>real audio</b> with Joonbi/Sijak/Baro wrapped around it, and Yuna counts over any tension markers you set.</p>
+        <p class="hint" id="clip-status">No clip yet.</p>
+        <div class="vp-buttons">
+          <label class="btn ghost file-btn">
+            Upload audio
+            <input type="file" id="clip-file" accept="audio/*,video/*" hidden />
+          </label>
+          <button class="btn" id="clip-play" disabled>Play</button>
+          <button class="btn ghost" id="clip-delete" disabled>Delete</button>
+        </div>
+
+        <div id="clip-tensions" hidden>
+          <p class="hint">Mark where each <b>tension (slow-count) movement</b> starts in the clip. During the drill, Yuna counts 1&ndash;5 / 1&ndash;8 over the audio at these points. Play the clip, then tap Mark at the moment the slow movement begins.</p>
+          <div class="vp-buttons">
+            <button class="btn" id="clip-mark5" disabled>Mark 5s @ now</button>
+            <button class="btn" id="clip-mark8" disabled>Mark 8s @ now</button>
+          </div>
+          <div id="clip-tension-list" class="clip-tension-list"></div>
+        </div>
+      </div>
+
+      <button class="test-btn" id="editor-test">&#9654; Test tempo</button>
+      <div class="editor-actions">
+        <button class="start-btn" id="editor-save">Save</button>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="screen" data-screen="settings">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Settings</h1>
+      </div>
+      <div class="panel">
+        <label class="check-row">
+          <input type="checkbox" id="set-voice" checked />
+          <span>Korean voice cues (Joonbi / count / Sijak / Baro)</span>
+        </label>
+        <label class="field">
+          <span>Voice (best-quality first)</span>
+          <select id="set-voicepick"></select>
+        </label>
+        <label class="field">
+          <span>Speed <b id="set-rate-val">0.95×</b></span>
+          <input type="range" id="set-rate" min="0.6" max="1.3" step="0.05" value="0.95" />
+        </label>
+        <label class="field">
+          <span>Pitch <b id="set-pitch-val">1.00×</b></span>
+          <input type="range" id="set-pitch" min="0.6" max="1.4" step="0.05" value="1.0" />
+        </label>
+        <label class="field">
+          <span>Count-in beat length (seconds)</span>
+          <input type="number" id="set-countbeat" min="0.5" max="2" step="0.1" value="1" />
+        </label>
+        <button class="btn" id="set-testvoice">Test voice</button>
+        <p class="hint" id="voice-hint">Uses the device's built-in Korean speech. <b>Biggest quality boost:</b> install the enhanced Korean voice — on iPhone/iPad/Mac, Settings → Accessibility → Spoken Content → Voices → Korean → download <b>Yuna</b>, then pick it above.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
+  <script src="js/data.js?v=38"></script>
+  <script src="js/audio.js?v=38"></script>
+  <script src="js/engine.js?v=38"></script>
+  <script src="js/app.js?v=38"></script>
+</body>
+</html>
