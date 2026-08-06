@@ -35,6 +35,7 @@
       if (dest === "settings") renderSettings();
       if (dest === "build-forms") renderFormsBuilder();
       if (dest === "build-drill") renderDrillBuilder();
+      if (dest === "randomizer") renderRandomizer();
       show(dest);
     }
   });
@@ -199,6 +200,79 @@
       sets: Math.max(1, Number($("#drill-sets").value) || 1),
       restSeconds: Math.max(0, Number($("#drill-rest").value) || 0),
     });
+  });
+
+  /* -------------------- POOMSAE RANDOMIZER -------------------- */
+  let rzSection = "black";
+  let rzDivision = "youth";
+  let rzRank = "yellow";
+
+  function renderRandomizer() {
+    $$("#rz-section .seg-btn").forEach((b) =>
+      b.classList.toggle("active", b.dataset.section === rzSection)
+    );
+    const isBlack = rzSection === "black";
+    $("#rz-div-wrap").hidden = !isBlack;
+    $("#rz-rank-wrap").hidden = isBlack;
+    // Black → real divisions (Youth…O30); Color → belt-rank ladder.
+    $("#rz-div").innerHTML = MT.CLIP_DIVISIONS.map((id) => {
+      const d = MT.DIVISIONS.find((x) => x.id === id) || { id, label: id };
+      return `<option value="${d.id}">${d.label}</option>`;
+    }).join("");
+    $("#rz-div").value = rzDivision;
+    $("#rz-rank").innerHTML = MT.COLOR_RANKS.map(
+      (r) => `<option value="${r.id}">${r.label}</option>`
+    ).join("");
+    $("#rz-rank").value = rzRank;
+    updateRzPool();
+    $("#rz-num").textContent = "—";
+    $("#rz-name").textContent = "Tap Randomize";
+  }
+
+  function updateRzPool() {
+    if (rzSection === "black") {
+      const label = (MT.DIVISIONS.find((d) => d.id === rzDivision) || {}).label || rzDivision;
+      $("#rz-pool").textContent = `Drawing from the ${label} compulsory set.`;
+    } else {
+      const rank = MT.COLOR_RANKS.find((r) => r.id === rzRank);
+      $("#rz-pool").textContent = `Drawing from Taegeuk 1–${rank ? rank.max : 8}.`;
+    }
+  }
+
+  $$("#rz-section .seg-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      rzSection = btn.dataset.section;
+      renderRandomizer();
+    })
+  );
+  $("#rz-div").addEventListener("change", (e) => {
+    rzDivision = e.target.value;
+    updateRzPool();
+  });
+  $("#rz-rank").addEventListener("change", (e) => {
+    rzRank = e.target.value;
+    updateRzPool();
+  });
+  $("#rz-go").addEventListener("click", () => {
+    const forms = MT.loadForms();
+    const key = rzSection === "black" ? rzDivision : rzRank;
+    const ids = MT.randomizerIdsFor(rzSection, key, forms);
+    if (!ids.length) return;
+    const id = ids[Math.floor(Math.random() * ids.length)];
+    const f = forms.find((x) => x.id === id);
+    if (!f) return;
+    $("#rz-num").textContent = f.id;
+    $("#rz-name").textContent = f.name;
+    // Announce the poomsae name (respects the voice on/off setting).
+    MT.unlockAudio();
+    if (MT.loadSettings().voice) MT.speak(f.spoken || f.name);
+    // quick pop animation
+    const card = $("#rz-name").closest(".rz-result");
+    if (card) {
+      card.classList.remove("rz-pop");
+      void card.offsetWidth; // reflow so the animation restarts
+      card.classList.add("rz-pop");
+    }
   });
 
   /* -------------------- RUN view -------------------- */

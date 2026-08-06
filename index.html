@@ -10,7 +10,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=50" />
+  <link rel="stylesheet" href="css/styles.css?v=51" />
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body>
@@ -33,6 +33,11 @@
           <span class="card-kicker">Drill</span>
           <span class="card-title">Kicks, Punches, &amp; Blocks</span>
           <span class="card-sub">N reps at one tempo &mdash; e.g. 20 kicks at 2s</span>
+        </button>
+        <button class="card big" data-goto="randomizer">
+          <span class="card-kicker">Randomize</span>
+          <span class="card-title">Poomsae Randomizer</span>
+          <span class="card-sub">Pick a random poomsae for a belt rank or division</span>
         </button>
         <button class="card" data-goto="editor">
           <span class="card-title">Rhythm Editor</span>
@@ -161,6 +166,38 @@
       <button class="start-btn" id="start-drill">Start Drill</button>
     </section>
 
+    <!-- ================= POOMSAE RANDOMIZER ================= -->
+    <section class="screen" data-screen="randomizer">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Poomsae Randomizer</h1>
+      </div>
+
+      <div class="panel">
+        <h2>Belt</h2>
+        <div class="seg" id="rz-section">
+          <button class="seg-btn active" data-section="black">Black Belt</button>
+          <button class="seg-btn" data-section="color">Color Belt</button>
+        </div>
+        <label class="field" id="rz-div-wrap">
+          <span>Division</span>
+          <select id="rz-div"></select>
+        </label>
+        <label class="field" id="rz-rank-wrap" hidden>
+          <span>Belt rank</span>
+          <select id="rz-rank"></select>
+        </label>
+        <p class="hint" id="rz-pool"></p>
+      </div>
+
+      <div class="panel rz-result">
+        <div id="rz-num" class="rz-num">&mdash;</div>
+        <div id="rz-name" class="rz-name">Tap Randomize</div>
+      </div>
+
+      <button class="start-btn" id="rz-go">&#127922; Randomize</button>
+    </section>
+
     <!-- ================= RUN ================= -->
     <section class="screen run" data-screen="run">
       <div class="run-top">
@@ -277,9 +314,9 @@
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=50"></script>
-  <script src="js/audio.js?v=50"></script>
-  <script src="js/engine.js?v=50"></script>
-  <script src="js/app.js?v=50"></script>
+  <script src="js/data.js?v=51"></script>
+  <script src="js/audio.js?v=51"></script>
+  <script src="js/engine.js?v=51"></script>
+  <script src="js/app.js?v=51"></script>
 </body>
 </html>

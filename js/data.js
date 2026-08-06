@@ -73,6 +73,33 @@
     o30: [8, 9, 10, 11, 12, 13, 14, 15], //  T8 → Chonkwon
   };
 
+  // Color-belt rank ladder for the Poomsae Randomizer. Each rank knows the
+  // highest Taegeuk that rank has learned; the draw is "that Taegeuk and below".
+  MT.COLOR_RANKS = [
+    { id: "yellow", label: "Yellow", max: 1 },
+    { id: "yellow1", label: "Yellow · 1 stripe", max: 2 },
+    { id: "green", label: "Green", max: 3 },
+    { id: "green1", label: "Green · 1 stripe", max: 4 },
+    { id: "blue", label: "Blue", max: 5 },
+    { id: "blue1", label: "Blue · 1 stripe", max: 6 },
+    { id: "red", label: "Red", max: 7 },
+    { id: "red1", label: "Red · 1 stripe", max: 8 },
+  ];
+
+  // Poomsae ids the randomizer can draw for a given belt/rank-or-division.
+  //  Color: Taegeuk 1..rank.max  ·  Black: that division's compulsory (Mixed) set.
+  MT.randomizerIdsFor = function (section, key, forms) {
+    const all = forms || [];
+    if (section === "black") {
+      const pool = MT.MIXED_POOMSAE[key] || [];
+      const ids = all.map((f) => f.id);
+      return pool.filter((id) => ids.indexOf(id) !== -1);
+    }
+    const rank = MT.COLOR_RANKS.find((r) => r.id === key);
+    const max = rank ? rank.max : 8;
+    return all.filter((f) => f.id <= max).map((f) => f.id);
+  };
+
   // Available poomsae ids for a belt section (+ division for black belt).
   // Color belt = Taegeuk 1–8; Black belt = the division's allowed list.
   MT.poomsaeIdsFor = function (section, division, forms) {
