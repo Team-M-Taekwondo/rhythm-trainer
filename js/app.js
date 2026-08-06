@@ -47,7 +47,7 @@
     sel.value = value != null ? value : 1;
   }
   /* -------------------- FORMS builder -------------------- */
-  let formsSection = "color";
+  let formsSection = "black";
   let formsDivision = "cadet";
   function sectionForms(section, division) {
     const all = MT.loadForms();
@@ -334,7 +334,7 @@
 
   /* -------------------- EDITOR -------------------- */
   let editorForm = null;
-  let editorSection = "color";
+  let editorSection = "black";
   let editorDivision = "cadet";
   const editorDiv = () => (editorSection === "black" ? editorDivision : "");
 

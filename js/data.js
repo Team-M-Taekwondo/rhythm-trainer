@@ -62,6 +62,16 @@
     o30: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   };
 
+  // Mixed-rotation pools — narrower than the full training lists above.
+  // Each division draws its random poomsae from this range in Mixed mode only.
+  MT.MIXED_POOMSAE = {
+    youth: [4, 5, 6, 7, 8, 9, 10], //  T4 → Keumgang
+    cadet: [4, 5, 6, 7, 8, 9, 10, 11], //  T4 → Taebaek
+    junior: [5, 6, 7, 8, 9, 10, 11, 12], //  T5 → Pyeongwon
+    u30: [7, 8, 9, 10, 11, 12, 13, 14], //  T7 → Jitae
+    o30: [8, 9, 10, 11, 12, 13, 14, 15], //  T8 → Chonkwon
+  };
+
   // Available poomsae ids for a belt section (+ division for black belt).
   // Color belt = Taegeuk 1–8; Black belt = the division's allowed list.
   MT.poomsaeIdsFor = function (section, division, forms) {

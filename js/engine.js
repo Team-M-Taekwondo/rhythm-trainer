@@ -252,7 +252,10 @@
     for (let r = 0; r < session.rounds; r++) {
       if (player.cancelled) return;
       const div = order[r % order.length];
-      const ids = MT.poomsaeIdsFor("black", div, forms);
+      const allIds = forms.map((x) => x.id);
+      const ids = (MT.MIXED_POOMSAE[div] || MT.poomsaeIdsFor("black", div, forms)).filter(
+        (id) => allIds.indexOf(id) !== -1
+      );
       const f = forms.find((x) => x.id === ids[Math.floor(Math.random() * ids.length)]);
       if (!f) continue;
       const item = {
