@@ -20,18 +20,45 @@
     return player.cancelled || player.skip;
   }
 
-  // Wait driven by the audio clock (not wall-clock) so Pause — which suspends
-  // the AudioContext and freezes MT.now() — freezes these waits too. Resolves
-  // early on Stop/Skip.
+  // Wall-clock wait (setTimeout), NOT the audio clock — on mobile the
+  // AudioContext can get suspended/interrupted (iOS does this around speech),
+  // which would freeze an audio-clock timer and hang the whole sequence.
+  // Pause is handled explicitly: each active wait registers a controller in
+  // player.waiters so Pause can freeze it and Resume can restart it. Stop/Skip
+  // resolve it immediately (the caller then sees stopped() and bails).
   function wait(seconds, player) {
     return new Promise((resolve) => {
       if (stopped(player)) return resolve();
-      const end = MT.now() + seconds;
-      (function poll() {
-        if (stopped(player)) return resolve();
-        if (MT.now() >= end) return resolve();
-        requestAnimationFrame(poll);
-      })();
+      let remaining = Math.max(0, seconds * 1000);
+      let startedAt = 0;
+      let timer = null;
+      let settled = false;
+      const ctl = {};
+      function done() {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        const i = player.waiters.indexOf(ctl);
+        if (i >= 0) player.waiters.splice(i, 1);
+        resolve();
+      }
+      function arm() {
+        if (settled) return;
+        startedAt = Date.now();
+        timer = setTimeout(done, remaining);
+      }
+      ctl.pause = function () {
+        if (settled || timer == null) return;
+        clearTimeout(timer);
+        timer = null;
+        remaining = Math.max(0, remaining - (Date.now() - startedAt));
+      };
+      ctl.resume = function () {
+        if (!settled && timer == null) arm();
+      };
+      ctl.finish = done; // Stop/Skip resolve immediately
+      player.waiters.push(ctl);
+      if (!player.paused) arm();
     });
   }
 
@@ -100,7 +127,7 @@
         });
         idx = -1; // re-announce the count at the new position
       }
-      scheduleFrom(0.15);
+      scheduleFrom(0); // start from the beginning (t0 already builds in a lead-in)
       player.seek = (frac) => scheduleFrom(Math.max(0, Math.min(1, frac)) * total);
 
       function tick() {
@@ -348,7 +375,7 @@
   // }
   MT.runSession = async function (session, cb) {
     const settings = MT.loadSettings();
-    const player = { cancelled: false, skip: false, paused: false, seek: null, timers: [], bus: MT.createBus() };
+    const player = { cancelled: false, skip: false, paused: false, seek: null, timers: [], waiters: [], bus: MT.createBus() };
     MT._current = player;
     MT.unlockAudio();
 
@@ -413,6 +440,7 @@
     if (!p) return;
     p.cancelled = true;
     p.timers.forEach((id) => clearTimeout(id));
+    p.waiters.slice().forEach((w) => w.finish());
     MT.cancelSpeech();
     if (p.clipSrc) {
       try {
@@ -438,6 +466,7 @@
     const p = MT._current;
     if (!p || p.cancelled || p.paused) return !!(p && p.paused);
     p.paused = true;
+    p.waiters.slice().forEach((w) => w.pause());
     try {
       if (window.speechSynthesis) window.speechSynthesis.pause();
     } catch (e) {}
@@ -449,6 +478,7 @@
     if (!p || p.cancelled || !p.paused) return false;
     p.paused = false;
     MT.resumeAudio();
+    p.waiters.slice().forEach((w) => w.resume());
     try {
       if (window.speechSynthesis) window.speechSynthesis.resume();
     } catch (e) {}
@@ -474,6 +504,7 @@
     if (!p || p.cancelled) return;
     if (p.paused) MT.resumeSession(); // so the next item can actually play
     p.skip = true;
+    p.waiters.slice().forEach((w) => w.finish()); // release any active wait now
     // Silence whatever this item already scheduled: stop the clip and swap in a
     // fresh bus (the old one — with its queued beats — is disconnected).
     if (p.clipSrc) {

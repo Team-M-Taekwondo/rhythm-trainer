@@ -94,9 +94,19 @@
   // Play one metronome hit. bus defaults to master.
   MT.playSound = function (soundId, t, accent, bus) {
     ensureContext();
+    keepAlive();
     const v = VOICES[soundId] || VOICES.woodblock;
     v(t, !!accent, bus || master);
   };
+
+  // iOS suspends/interrupts the AudioContext around speech; resume it before we
+  // schedule audio so the metronome/clips actually play. Skip if the run was
+  // deliberately paused (don't fight Pause).
+  function keepAlive() {
+    if (ctx && ctx.state !== "running" && !(MT._current && MT._current.paused)) {
+      try { ctx.resume(); } catch (e) {}
+    }
+  }
 
   // High-pitched "digital countdown" blip for the last-5-seconds get-ready
   // beeps (rest between poomsae, Mixed switch, drill rest/countdown). Much
@@ -104,6 +114,7 @@
   // the "1" before Go) is higher, louder and a touch longer.
   MT.playCountdownBeep = function (t, isFinal, bus) {
     ensureContext();
+    keepAlive();
     const out = bus || master;
     const freq = isFinal ? 2640 : 1900;
     const dur = isFinal ? 0.15 : 0.08;
@@ -132,7 +143,8 @@
   };
   MT.resumeAudio = function () {
     ensureContext();
-    return ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+    // Resume from "suspended" and iOS's "interrupted" state alike.
+    return ctx.state !== "running" ? ctx.resume().catch(() => {}) : Promise.resolve();
   };
 
   // A "bus" that a whole run routes through, so Stop can silence everything
@@ -365,6 +377,7 @@
   // scrubbing — Web Audio sources can't be seeked, so we restart at an offset).
   MT.playClipAt = function (section, division, id, bus, offset) {
     ensureContext();
+    keepAlive();
     const buf = CLIP_CACHE.get(clipKey(section, division, id));
     if (!buf) return null;
     const src = ctx.createBufferSource();
