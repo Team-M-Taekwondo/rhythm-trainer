@@ -286,6 +286,8 @@
     if (stopped(player)) return;
     cb.onPhase("joonbi", "Joonbi");
     await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+    if (stopped(player)) return;
+    await wait(0.5, player); // brief beat before the count-in
     await countIn(player, cb, settings);
     if (stopped(player)) return;
     cb.onPhase("sijak", "Sijak");
@@ -303,6 +305,7 @@
     cb.onPhase("baro", "Baro");
     await say(MT.CUES.baro.say, player, settings, STYLE.baro);
     if (stopped(player)) return;
+    await wait(0.5, player); // brief beat before the recovery count-in
     // Recovery 5-count after Baro, then the "at ease" (suh) command.
     await countIn(player, cb, settings);
     if (stopped(player)) return;
