@@ -9,6 +9,7 @@
   let ctx = null;
   let master = null;
   let noiseBuffer = null;
+  let keepAliveSrc = null;
 
   function ensureContext() {
     if (ctx) return ctx;
@@ -21,13 +22,40 @@
     noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = noiseBuffer.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    // iOS Safari: SpeechSynthesis interrupts the AudioContext. When the
+    // interruption ends the context drops to "suspended" — auto-resume it (as
+    // long as a session is running and not deliberately paused) so the
+    // metronome/clips come back instead of hanging.
+    ctx.onstatechange = function () {
+      if (ctx.state === "suspended" && MT._current && !MT._current.paused) {
+        ctx.resume().catch(function () {});
+      }
+    };
     return ctx;
+  }
+
+  // A silent, looping source that keeps the audio session "live." On iOS this
+  // makes the context far more resilient to being torn down by speech.
+  function startKeepAliveSource() {
+    if (!ctx || keepAliveSrc) return;
+    try {
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const g = ctx.createGain();
+      g.gain.value = 0; // fully silent
+      src.connect(g).connect(ctx.destination);
+      src.start();
+      keepAliveSrc = src;
+    } catch (e) {}
   }
 
   // Must be called from a user gesture (button tap) to unlock audio on mobile.
   MT.unlockAudio = function () {
     ensureContext();
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state !== "running") ctx.resume().catch(function () {});
+    startKeepAliveSource();
     // also warm up speech synthesis
     try {
       const u = new SpeechSynthesisUtterance("");
