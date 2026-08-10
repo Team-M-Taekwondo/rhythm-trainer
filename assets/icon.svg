@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MTEAM Tempo">
+  <rect width="512" height="512" fill="#0d0d0f"/>
+  <text x="256" y="238" text-anchor="middle" dominant-baseline="middle"
+        font-family="Arial Black, Helvetica, Arial, sans-serif" font-weight="900"
+        font-size="300" fill="#e7b10a">M</text>
+  <!-- three gold "beat" dots — the tempo motif -->
+  <g fill="#e7b10a">
+    <circle cx="196" cy="392" r="17"/>
+    <circle cx="256" cy="392" r="17"/>
+    <circle cx="316" cy="392" r="17"/>
+  </g>
+</svg>
