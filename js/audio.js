@@ -54,8 +54,13 @@
   // Must be called from a user gesture (button tap) to unlock audio on mobile.
   MT.unlockAudio = function () {
     ensureContext();
-    if (ctx.state !== "running") ctx.resume().catch(function () {});
+    if (ctx.state !== "running") {
+      ctx.resume().then(function () { MT.decodePendingClips && MT.decodePendingClips(); }).catch(function () {});
+    }
     startKeepAliveSource();
+    // Decode any repo clips that couldn't decode while the context was suspended
+    // (iOS). Runs now and again after resume() settles above.
+    if (MT.decodePendingClips) MT.decodePendingClips();
     // also warm up speech synthesis
     try {
       const u = new SpeechSynthesisUtterance("");
@@ -371,6 +376,13 @@
     CLIP_CACHE.delete(k);
   };
 
+  // Repo clips fetched but not yet decoded. On iOS Safari, decodeAudioData
+  // fails while the AudioContext is suspended (i.e. before the first user tap),
+  // so we fetch at load time (fetch works fine suspended) and decode later,
+  // once the context is unlocked. Otherwise the team's audio silently fails to
+  // load on iPhones and every poomsae falls back to the metronome.
+  const REPO_PENDING = new Map(); // key -> ArrayBuffer
+
   // Clips shipped in the repo (data/clips.json + audio files). This is how the
   // whole team gets the audio — no browser upload needed.
   MT.loadRepoClips = async function () {
@@ -386,14 +398,36 @@
     const list = (manifest && manifest.clips) || [];
     for (const c of list) {
       const k = clipKey(c.section, c.division || "", c.poomsae);
-      if (!c.file || CLIP_CACHE.has(k)) continue; // don't clobber a local upload
+      if (!c.file || CLIP_CACHE.has(k) || REPO_PENDING.has(k)) continue; // don't clobber a local upload
       try {
         const r = await fetch(c.file);
         if (!r.ok) continue;
-        CLIP_CACHE.set(k, await ctx.decodeAudioData(await r.arrayBuffer()));
+        REPO_PENDING.set(k, await r.arrayBuffer());
       } catch (e) {}
     }
+    await decodePending();
   };
+
+  // Decode any fetched-but-undecoded repo clips into the cache. Safe to call
+  // repeatedly (decodes only what's still pending). decodeAudioData detaches
+  // its input, so hand it a copy and keep the original for a later retry.
+  async function decodePending() {
+    if (!ctx || !REPO_PENDING.size) return;
+    for (const [k, buf] of Array.from(REPO_PENDING.entries())) {
+      if (CLIP_CACHE.has(k)) {
+        REPO_PENDING.delete(k);
+        continue;
+      }
+      try {
+        const decoded = await ctx.decodeAudioData(buf.slice(0));
+        CLIP_CACHE.set(k, decoded);
+        REPO_PENDING.delete(k);
+      } catch (e) {
+        // Still suspended/failed — leave pending; retry on the next unlock.
+      }
+    }
+  }
+  MT.decodePendingClips = decodePending;
 
   // Start playing a stored clip through `bus`; returns the source node
   // (caller manages onended / stop), or null if there's no clip.
