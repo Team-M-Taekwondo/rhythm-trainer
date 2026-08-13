@@ -545,8 +545,8 @@
   MT.drillToItem = function (drill) {
     const counts = [];
     for (let i = 0; i < drill.reps; i++) {
-      // Mark every 10th rep so the milestone triple-beep fires there.
-      counts.push({ n: i + 1, duration: drill.duration, accent: false, mark: (i + 1) % 10 === 0 });
+      // Mark the LAST rep so the milestone triple-beep fires at the end of the set.
+      counts.push({ n: i + 1, duration: drill.duration, accent: false, mark: i + 1 === drill.reps });
     }
     return {
       type: "drill",
