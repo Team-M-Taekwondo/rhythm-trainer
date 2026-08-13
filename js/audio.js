@@ -22,12 +22,13 @@
     noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = noiseBuffer.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    // iOS Safari: SpeechSynthesis interrupts the AudioContext. When the
-    // interruption ends the context drops to "suspended" — auto-resume it (as
-    // long as a session is running and not deliberately paused) so the
-    // metronome/clips come back instead of hanging.
+    // iOS Safari: SpeechSynthesis puts the AudioContext into "interrupted"
+    // WHILE it speaks, then drops it to "suspended" once the speech ends. Only
+    // auto-resume from "suspended" — resuming during "interrupted" would grab
+    // the audio session back mid-word and silence the speech (e.g. the drill's
+    // "Sijak"). "suspended" is exactly when the metronome should come back.
     ctx.onstatechange = function () {
-      if (ctx.state !== "running" && MT._current && !MT._current.paused) {
+      if (ctx.state === "suspended" && MT._current && !MT._current.paused) {
         ctx.resume().catch(function () {});
       }
     };
