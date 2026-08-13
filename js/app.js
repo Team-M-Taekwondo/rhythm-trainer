@@ -20,6 +20,31 @@
   const isAdmin = localStorage.getItem("mteam.admin") === "1";
   document.body.classList.toggle("admin", isAdmin);
 
+  /* -------------------- debug overlay (?debug=1) --------------------
+     Shows a live log of audio-context state + speech events on-screen, so we
+     can see what iOS is doing to the spoken cues on a real device. */
+  if (_params.get("debug") === "1") {
+    const box = document.createElement("div");
+    box.style.cssText =
+      "position:fixed;top:0;left:0;right:0;max-height:38vh;overflow:hidden;z-index:99999;" +
+      "background:rgba(0,0,0,.86);color:#7CFC00;font:11px/1.3 ui-monospace,Menlo,monospace;" +
+      "padding:6px 8px;white-space:pre-wrap;pointer-events:none;";
+    const add = () => document.body.appendChild(box);
+    if (document.body) add(); else document.addEventListener("DOMContentLoaded", add);
+    const lines = [];
+    let n = 0;
+    MT._log = function (m) {
+      n++;
+      lines.push(n + " " + m);
+      if (lines.length > 40) lines.shift();
+      box.textContent = lines.join("\n");
+    };
+    MT._log(
+      "debug on · SS=" + (window.speechSynthesis ? "yes" : "no") +
+      " voices=" + (window.speechSynthesis ? speechSynthesis.getVoices().length : 0)
+    );
+  }
+
   /* -------------------- screen routing -------------------- */
   function show(name) {
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));

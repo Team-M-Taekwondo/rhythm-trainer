@@ -6,6 +6,14 @@
 (function () {
   const MT = (window.MT = window.MT || {});
 
+  // Debug hook — app.js replaces this with an on-screen logger when ?debug=1.
+  MT._log = MT._log || function () {};
+  function dlog(m) {
+    try {
+      MT._log(m);
+    } catch (e) {}
+  }
+
   let ctx = null;
   let master = null;
   let noiseBuffer = null;
@@ -28,6 +36,7 @@
     // the audio session back mid-word and silence the speech (e.g. the drill's
     // "Sijak"). "suspended" is exactly when the metronome should come back.
     ctx.onstatechange = function () {
+      dlog("ctx→" + ctx.state);
       // Don't resume while we're intentionally speaking (MT.speak yields the
       // audio session to SpeechSynthesis on iOS) — grabbing it back would cut
       // the spoken cue off, e.g. the drill's "Sijak".
@@ -289,19 +298,27 @@
       };
 
       const doSpeak = function () {
+        const ss = window.speechSynthesis;
+        dlog(
+          'speak "' + text + '" ctx=' + (ctx ? ctx.state : "?") +
+          " ss[spk=" + ss.speaking + " pend=" + ss.pending + " paused=" + ss.paused + "]" +
+          " voices=" + ss.getVoices().length
+        );
         // Leading zero-width space avoids some voices clipping the first syllable.
         const u = new SpeechSynthesisUtterance("​" + text);
         const v = pickVoice();
         if (v) u.voice = v;
+        dlog("  voice=" + (v ? v.name : "NONE"));
         u.lang = opts.lang || (v ? v.lang : "ko-KR");
         u.rate = clamp(tuning.rate * (opts.rate || 1.0), 0.5, 2.0);
         u.pitch = clamp(tuning.pitch * (opts.pitch || 1.0), 0.5, 2.0);
         u.volume = 1.0;
-        u.onend = finish;
-        u.onerror = finish;
+        u.onstart = function () { dlog('  ▶ start "' + text + '"'); };
+        u.onend = function () { dlog('  ■ end "' + text + '"'); finish(); };
+        u.onerror = function (e) { dlog("  ✕ error " + (e && e.error)); finish(); };
         // safety: never hang the sequence if the engine drops the event
         setTimeout(finish, 2500);
-        window.speechSynthesis.speak(u);
+        ss.speak(u);
       };
 
       // iOS: an actively-rendering AudioContext (e.g. the drill's countdown
