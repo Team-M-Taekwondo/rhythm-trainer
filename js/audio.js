@@ -27,7 +27,7 @@
     // long as a session is running and not deliberately paused) so the
     // metronome/clips come back instead of hanging.
     ctx.onstatechange = function () {
-      if (ctx.state === "suspended" && MT._current && !MT._current.paused) {
+      if (ctx.state !== "running" && MT._current && !MT._current.paused) {
         ctx.resume().catch(function () {});
       }
     };
@@ -61,11 +61,10 @@
     // Decode any repo clips that couldn't decode while the context was suspended
     // (iOS). Runs now and again after resume() settles above.
     if (MT.decodePendingClips) MT.decodePendingClips();
-    // also warm up speech synthesis
-    try {
-      const u = new SpeechSynthesisUtterance("");
-      window.speechSynthesis.speak(u);
-    } catch (e) {}
+    // NOTE: no empty-utterance "speech warm-up" here on purpose — on iOS it
+    // interrupts the AudioContext right at unlock, and the drill (which has no
+    // spoken cues to trigger recovery) then hangs with a silent metronome. The
+    // zero-width space prepended in MT.speak already prevents first-syllable clipping.
   };
 
   MT.now = function () {

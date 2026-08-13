@@ -262,6 +262,9 @@
   }
   async function runDrill(session, player, cb, settings) {
     const drill = session.items[0];
+    // The drill has no spoken cue to revive the audio clock, so make sure it's
+    // running before the (audio-clock-driven) countdown/metronome start.
+    if (MT.resumeAudio) MT.resumeAudio();
     for (let s = 0; s < session.sets; s++) {
       if (player.cancelled) return;
       player.skip = false; // each set starts fresh; a Skip advances to here
