@@ -236,13 +236,23 @@
     });
   }
 
-  /* ---- Drill flow: no Joonbi/Baro. 3-beep countdown → Sijak → reps →
-     rest (beeps in the last 5s) → Sijak → next set. ---- */
+  // Spoken get-ready countdown number (Yuna) in place of beeps — native Korean
+  // numbers (하나…다섯) counted down; only 1–5 are voiced. Fire-and-forget so it
+  // overlaps the 1s wait. Speech (not Web Audio) keeps a following spoken cue
+  // like "Sijak" audible on iOS.
+  function sayCountdown(r, settings) {
+    if (settings && settings.voice && r >= 1 && r <= 5) {
+      MT.speak(MT.KO_NUMBERS[r - 1], { rate: 1.05 });
+    }
+  }
+
+  /* ---- Drill flow: no Joonbi/Baro. Spoken 3-2-1 countdown → Sijak → reps →
+     rest (spoken countdown in the last 5s) → Sijak → next set. ---- */
   async function drillCountdown(player, cb, settings) {
     for (let n = 3; n >= 1; n--) {
       if (stopped(player)) return;
       cb.onPhase("countdown", "", n);
-      MT.playCountdownBeep(MT.now() + 0.02, n === 1, player.bus);
+      sayCountdown(n, settings);
       await wait(1, player);
     }
     if (stopped(player)) return;
@@ -253,7 +263,7 @@
     for (let r = seconds; r > 0; r--) {
       if (stopped(player)) return;
       cb.onPhase("rest", "Rest", r);
-      if (r <= 5) MT.playCountdownBeep(MT.now() + 0.02, r === 1, player.bus);
+      sayCountdown(r, settings);
       await wait(1, player);
     }
     if (stopped(player)) return;
@@ -317,12 +327,12 @@
     await say(MT.CUES.swieo.say, player, settings, STYLE.swieo);
   }
 
-  // Switch time between Mixed rounds — counts down, beeps the last 5s.
-  async function switchTimer(seconds, nextLabel, player, cb) {
+  // Switch time between Mixed rounds — spoken countdown the last 5s.
+  async function switchTimer(seconds, nextLabel, player, cb, settings) {
     for (let r = seconds; r > 0; r--) {
       if (stopped(player)) return;
       cb.onPhase("switch", nextLabel, r);
-      if (r <= 5) MT.playCountdownBeep(MT.now() + 0.02, r === 1, player.bus);
+      sayCountdown(r, settings);
       await wait(1, player);
     }
   }
@@ -369,7 +379,7 @@
       await runPoomsaeItem(item, player, cb, settings);
       if (player.cancelled) return;
       if (r < session.rounds - 1) {
-        await switchTimer(session.switchSeconds, labelOf(order[(r + 1) % order.length]), player, cb);
+        await switchTimer(session.switchSeconds, labelOf(order[(r + 1) % order.length]), player, cb, settings);
       }
     }
   }
@@ -424,8 +434,8 @@
           for (let r = session.restSeconds; r > 0; r--) {
             if (stopped(player)) break;
             cb.onPhase("rest", "Rest", r);
-            // Digital countdown the last 5 seconds so athletes get ready for the next poomsae.
-            if (r <= 5) MT.playCountdownBeep(MT.now() + 0.02, r === 1, player.bus);
+            // Spoken countdown the last 5 seconds so athletes get ready for the next poomsae.
+            sayCountdown(r, settings);
             await wait(1, player);
           }
         }
