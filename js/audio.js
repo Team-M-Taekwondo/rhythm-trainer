@@ -242,12 +242,28 @@
 
   const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
+  // iOS/Safari drops the very FIRST spoken utterance after audio engages. We
+  // absorb that by queuing one silent utterance right before the first real one
+  // (lazily, not at unlock — doing it at unlock would interrupt the AudioContext
+  // and silence the drill's countdown beeps). Runs once per page load.
+  let speechPrimed = false;
+  function primeSpeechOnce() {
+    if (speechPrimed || !window.speechSynthesis) return;
+    speechPrimed = true;
+    try {
+      const p = new SpeechSynthesisUtterance("​"); // zero-width space, silent
+      p.volume = 0;
+      window.speechSynthesis.speak(p);
+    } catch (e) {}
+  }
+
   // Returns a promise that resolves when speech ends (or a safety timeout fires).
   // opts.rate / opts.pitch are per-call multipliers on top of the global tuning.
   MT.speak = function (text, opts) {
     opts = opts || {};
     return new Promise((resolve) => {
       if (!window.speechSynthesis || !text) return resolve();
+      primeSpeechOnce(); // absorb iOS's first-utterance drop
       // Leading zero-width space avoids some voices clipping the first syllable.
       const u = new SpeechSynthesisUtterance("​" + text);
       const v = pickVoice();
