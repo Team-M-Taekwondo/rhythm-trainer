@@ -69,8 +69,12 @@ body {
 .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
 .topbar h1 { font-size: 22px; margin: 0; }
 /* Small MTEAM mark on every screen header (white via the same invert trick as home). */
-.topbar-logo { height: 26px; width: auto; margin-left: auto; filter: invert(1); mix-blend-mode: screen; opacity: .9; pointer-events: none; }
-.run-top-logo { height: 22px; width: auto; filter: invert(1); mix-blend-mode: screen; opacity: .8; pointer-events: none; }
+.topbar-logo { height: 32px; width: auto; margin-left: auto; filter: invert(1); mix-blend-mode: screen; opacity: .9; pointer-events: none; }
+/* Run screen: truly centered (absolute) so the space-between meta doesn't push it off. */
+.run-top-logo {
+  position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
+  height: 44px; width: auto; filter: invert(1); mix-blend-mode: screen; opacity: .9; pointer-events: none;
+}
 .topbar-logo.logo-fallback, .run-top-logo.logo-fallback { filter: none; mix-blend-mode: normal; }
 .icon-btn {
   width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line);
@@ -216,7 +220,7 @@ body.running { background: #000; }
   flex-direction: column; min-height: 100dvh; padding: 20px;
   justify-content: space-between; text-align: center;
 }
-.run-top { display: flex; align-items: center; justify-content: space-between; }
+.run-top { position: relative; display: flex; align-items: center; justify-content: space-between; }
 .run-meta { display: flex; flex-direction: column; align-items: flex-end; color: var(--muted); font-size: 14px; }
 #run-setinfo { color: var(--gold); font-weight: 700; letter-spacing: .05em; }
 #run-belt { color: var(--text); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; font-size: 12px; }
