@@ -278,6 +278,20 @@
     return ko[0] || null;
   }
 
+  // Best-quality voice for a given language (e.g. "en-US" → the nicest English
+  // voice, not the robotic compact default). Korean falls back to pickVoice so
+  // it still honours the user's chosen Yuna voice.
+  function pickVoiceForLang(lang) {
+    if (!window.speechSynthesis) return null;
+    if (!lang || lang.toLowerCase().indexOf("ko") === 0) return pickVoice();
+    const prefix = lang.toLowerCase().slice(0, 2);
+    const matches = window.speechSynthesis
+      .getVoices()
+      .filter((v) => (v.lang || "").toLowerCase().slice(0, 2) === prefix)
+      .sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    return matches[0] || null;
+  }
+
   const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
   // iOS/Safari drops the very FIRST spoken utterance after audio engages. We
@@ -316,15 +330,18 @@
       );
       // Leading zero-width space avoids some voices clipping the first syllable.
       const u = new SpeechSynthesisUtterance("​" + text);
-      // For non-Korean cues (e.g. the English countdown) don't force the Korean
-      // voice — let the browser use its default voice for that language.
-      const useKo = !opts.lang || opts.lang.toLowerCase().indexOf("ko") === 0;
-      const v = useKo ? pickVoice() : null;
+      const v = pickVoiceForLang(opts.lang);
       if (v) u.voice = v;
       dlog("  voice=" + (v ? v.name : "NONE") + " lang=" + (opts.lang || "ko-KR"));
       u.lang = opts.lang || (v ? v.lang : "ko-KR");
-      u.rate = clamp(tuning.rate * (opts.rate || 1.0), 0.5, 2.0);
-      u.pitch = clamp(tuning.pitch * (opts.pitch || 1.0), 0.5, 2.0);
+      // opts.absolute uses rate/pitch as-is (natural), skipping the deep/slow
+      // Yuna tuning — used for the English countdown so it isn't fast/robotic.
+      u.rate = opts.absolute
+        ? clamp(opts.rate || 1.0, 0.5, 2.0)
+        : clamp(tuning.rate * (opts.rate || 1.0), 0.5, 2.0);
+      u.pitch = opts.absolute
+        ? clamp(opts.pitch || 1.0, 0.5, 2.0)
+        : clamp(tuning.pitch * (opts.pitch || 1.0), 0.5, 2.0);
       u.volume = 1.0;
       u.onstart = function () { dlog('  ▶ start "' + text + '"'); };
       u.onend = function () { dlog('  ■ end "' + text + '"'); finish(); };

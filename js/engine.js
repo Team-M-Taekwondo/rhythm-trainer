@@ -246,7 +246,8 @@
   const EN_COUNT = ["one", "two", "three", "four", "five"];
   function sayCountdown(r, settings) {
     if (settings && settings.voice && r >= 1 && r <= 5) {
-      MT.speak(EN_COUNT[r - 1], { lang: "en-US", rate: 1.05 });
+      // Natural, slightly-slow English voice (not the deep/fast Yuna tuning).
+      MT.speak(EN_COUNT[r - 1], { lang: "en-US", absolute: true, rate: 0.85, pitch: 1.0 });
     }
   }
 
