@@ -58,7 +58,11 @@
     if (ctx.state !== "running") {
       ctx.resume().then(function () { MT.decodePendingClips && MT.decodePendingClips(); }).catch(function () {});
     }
-    startKeepAliveSource();
+    // NOTE: intentionally NOT starting a continuous keep-alive source here. On
+    // iOS a permanently-running Web Audio source holds the audio session, which
+    // blocks SpeechSynthesis (spoken cues like the drill "Sijak" go silent). The
+    // metronome stays alive instead via resume-on-each-beat + the "suspended"
+    // statechange handler, which don't fight speech.
     // Decode any repo clips that couldn't decode while the context was suspended
     // (iOS). Runs now and again after resume() settles above.
     if (MT.decodePendingClips) MT.decodePendingClips();
