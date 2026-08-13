@@ -46,6 +46,27 @@
     );
   }
 
+  /* -------------------- brand logo on every screen --------------------
+     Home has the big logo; stamp a small MTEAM mark into every other screen's
+     header so the brand shows across the whole app. */
+  (function stampLogos() {
+    const mk = (cls) => {
+      const img = document.createElement("img");
+      img.className = cls;
+      img.src = "assets/logo1.JPG";
+      img.alt = "MTEAM";
+      img.onerror = function () {
+        this.onerror = null;
+        this.src = "assets/logo-light.svg";
+        this.classList.add("logo-fallback");
+      };
+      return img;
+    };
+    $$(".topbar").forEach((bar) => bar.appendChild(mk("topbar-logo")));
+    const runTop = $(".run-top");
+    if (runTop) runTop.insertBefore(mk("run-top-logo"), runTop.querySelector(".run-meta"));
+  })();
+
   /* -------------------- screen routing -------------------- */
   function show(name) {
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));

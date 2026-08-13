@@ -241,9 +241,10 @@
   };
 
   // App settings (voice on/off, chosen voice, count-in beat length).
-  // v2: slower, deeper voice defaults (less choppy, more bass-like).
-  const SETTINGS_KEY = "mteam.settings.v2";
-  MT.defaultSettings = { voice: true, voiceURI: "", countBeat: 1.0, rate: 0.82, pitch: 0.88 };
+  // v3: natural pitch (no artificial deepening) + slightly slower rate so Yuna
+  // annunciates clearly instead of sounding choppy/robotic.
+  const SETTINGS_KEY = "mteam.settings.v3";
+  MT.defaultSettings = { voice: true, voiceURI: "", countBeat: 1.0, rate: 0.8, pitch: 1.0 };
 
   MT.loadSettings = function () {
     try {
