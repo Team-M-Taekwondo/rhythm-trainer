@@ -137,6 +137,30 @@
     },
   };
 
+  // Milestone marker for the drill — a bright ascending triple-beep on every
+  // 10th rep so athletes can hear the tens without counting in their head.
+  MT.playMilestone = function (t, bus) {
+    ensureContext();
+    keepAlive();
+    const out = bus || master;
+    [880, 1175, 1568].forEach((f, i) => {
+      const at = t + i * 0.12;
+      const o = ctx.createOscillator();
+      o.type = "square";
+      o.frequency.setValueAtTime(f, at);
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = 5200;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(0.95, at + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+      o.connect(filt).connect(g).connect(out);
+      o.start(at);
+      o.stop(at + 0.15);
+    });
+  };
+
   // Play one metronome hit. bus defaults to master.
   MT.playSound = function (soundId, t, accent, bus) {
     ensureContext();
@@ -292,9 +316,12 @@
       );
       // Leading zero-width space avoids some voices clipping the first syllable.
       const u = new SpeechSynthesisUtterance("​" + text);
-      const v = pickVoice();
+      // For non-Korean cues (e.g. the English countdown) don't force the Korean
+      // voice — let the browser use its default voice for that language.
+      const useKo = !opts.lang || opts.lang.toLowerCase().indexOf("ko") === 0;
+      const v = useKo ? pickVoice() : null;
       if (v) u.voice = v;
-      dlog("  voice=" + (v ? v.name : "NONE"));
+      dlog("  voice=" + (v ? v.name : "NONE") + " lang=" + (opts.lang || "ko-KR"));
       u.lang = opts.lang || (v ? v.lang : "ko-KR");
       u.rate = clamp(tuning.rate * (opts.rate || 1.0), 0.5, 2.0);
       u.pitch = clamp(tuning.pitch * (opts.pitch || 1.0), 0.5, 2.0);

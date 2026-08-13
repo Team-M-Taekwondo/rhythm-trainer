@@ -82,7 +82,7 @@
           }
           acc += Math.max(0, (c.duration || N) - N);
         } else {
-          events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent });
+          events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent, mark: c.mark });
           acc += Math.max(0.1, c.duration);
         }
       });
@@ -116,7 +116,11 @@
         events.forEach((e) => {
           if (e.rt < offset - 1e-6) return;
           const at = startT + e.rt;
-          MT.playSound(soundId, at, e.kind === "beat" ? e.accent : e.k === 1, metroBus);
+          if (e.kind === "beat" && e.mark) {
+            MT.playMilestone(at, metroBus); // every-10th-rep marker
+          } else {
+            MT.playSound(soundId, at, e.kind === "beat" ? e.accent : e.k === 1, metroBus);
+          }
           if (settings && settings.voice && e.kind === "tension") {
             const id = setTimeout(() => {
               if (!player.cancelled) MT.speak(MT.KO_NUMBERS_8[e.k - 1], { rate: 1.0 });
@@ -236,13 +240,13 @@
     });
   }
 
-  // Spoken get-ready countdown number (Yuna) in place of beeps — native Korean
-  // numbers (하나…다섯) counted down; only 1–5 are voiced. Fire-and-forget so it
-  // overlaps the 1s wait. Speech (not Web Audio) keeps a following spoken cue
-  // like "Sijak" audible on iOS.
+  // Spoken get-ready countdown number in ENGLISH in place of beeps — only 1–5
+  // are voiced. Fire-and-forget so it overlaps the 1s wait. Speech (not Web
+  // Audio) keeps a following spoken cue like "Sijak" audible on iOS.
+  const EN_COUNT = ["one", "two", "three", "four", "five"];
   function sayCountdown(r, settings) {
     if (settings && settings.voice && r >= 1 && r <= 5) {
-      MT.speak(MT.KO_NUMBERS[r - 1], { rate: 1.05 });
+      MT.speak(EN_COUNT[r - 1], { lang: "en-US", rate: 1.05 });
     }
   }
 
@@ -540,7 +544,8 @@
   MT.drillToItem = function (drill) {
     const counts = [];
     for (let i = 0; i < drill.reps; i++) {
-      counts.push({ n: i + 1, duration: drill.duration, accent: false });
+      // Mark every 10th rep so the milestone triple-beep fires there.
+      counts.push({ n: i + 1, duration: drill.duration, accent: false, mark: (i + 1) % 10 === 0 });
     }
     return {
       type: "drill",
