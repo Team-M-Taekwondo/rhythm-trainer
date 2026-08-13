@@ -326,7 +326,10 @@
       // play; the next sound (metronome/clip) re-acquires the session via
       // keepAlive. On desktop this is a harmless no-op for timing.
       if (ctx && ctx.state === "running") {
-        ctx.suspend().then(doSpeak).catch(doSpeak);
+        // Suspend, then wait for iOS to actually release the audio session after
+        // recent Web Audio (e.g. the drill's countdown beeps). Speaking too soon
+        // gets the utterance silently dropped.
+        ctx.suspend().then(function () { setTimeout(doSpeak, 500); }).catch(doSpeak);
       } else {
         doSpeak();
       }

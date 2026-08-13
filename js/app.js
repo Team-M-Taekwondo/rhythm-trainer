@@ -33,9 +33,10 @@
     if (document.body) add(); else document.addEventListener("DOMContentLoaded", add);
     const lines = [];
     let n = 0;
+    const t0 = performance.now();
     MT._log = function (m) {
       n++;
-      lines.push(n + " " + m);
+      lines.push(n + " +" + Math.round(performance.now() - t0) + "ms " + m);
       if (lines.length > 40) lines.shift();
       box.textContent = lines.join("\n");
     };
