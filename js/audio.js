@@ -28,7 +28,15 @@
     // the audio session back mid-word and silence the speech (e.g. the drill's
     // "Sijak"). "suspended" is exactly when the metronome should come back.
     ctx.onstatechange = function () {
-      if (ctx.state === "suspended" && MT._current && !MT._current.paused) {
+      // Don't resume while we're intentionally speaking (MT.speak yields the
+      // audio session to SpeechSynthesis on iOS) — grabbing it back would cut
+      // the spoken cue off, e.g. the drill's "Sijak".
+      if (
+        ctx.state === "suspended" &&
+        MT._current &&
+        !MT._current.paused &&
+        !MT._current.speaking
+      ) {
         ctx.resume().catch(function () {});
       }
     };
@@ -269,25 +277,42 @@
     return new Promise((resolve) => {
       if (!window.speechSynthesis || !text) return resolve();
       primeSpeechOnce(); // absorb iOS's first-utterance drop
-      // Leading zero-width space avoids some voices clipping the first syllable.
-      const u = new SpeechSynthesisUtterance("​" + text);
-      const v = pickVoice();
-      if (v) u.voice = v;
-      u.lang = opts.lang || (v ? v.lang : "ko-KR");
-      u.rate = clamp(tuning.rate * (opts.rate || 1.0), 0.5, 2.0);
-      u.pitch = clamp(tuning.pitch * (opts.pitch || 1.0), 0.5, 2.0);
-      u.volume = 1.0;
+      const p = MT._current;
+      if (p) p.speaking = (p.speaking || 0) + 1; // pause the auto-resume handler
+
       let done = false;
       const finish = () => {
         if (done) return;
         done = true;
+        if (p) p.speaking = Math.max(0, (p.speaking || 1) - 1);
         resolve();
       };
-      u.onend = finish;
-      u.onerror = finish;
-      // safety: never hang the sequence if the engine drops the event
-      setTimeout(finish, 2500);
-      window.speechSynthesis.speak(u);
+
+      const doSpeak = function () {
+        // Leading zero-width space avoids some voices clipping the first syllable.
+        const u = new SpeechSynthesisUtterance("​" + text);
+        const v = pickVoice();
+        if (v) u.voice = v;
+        u.lang = opts.lang || (v ? v.lang : "ko-KR");
+        u.rate = clamp(tuning.rate * (opts.rate || 1.0), 0.5, 2.0);
+        u.pitch = clamp(tuning.pitch * (opts.pitch || 1.0), 0.5, 2.0);
+        u.volume = 1.0;
+        u.onend = finish;
+        u.onerror = finish;
+        // safety: never hang the sequence if the engine drops the event
+        setTimeout(finish, 2500);
+        window.speechSynthesis.speak(u);
+      };
+
+      // iOS: an actively-rendering AudioContext (e.g. the drill's countdown
+      // beeps) blocks SpeechSynthesis. Suspend it first so the spoken cue can
+      // play; the next sound (metronome/clip) re-acquires the session via
+      // keepAlive. On desktop this is a harmless no-op for timing.
+      if (ctx && ctx.state === "running") {
+        ctx.suspend().then(doSpeak).catch(doSpeak);
+      } else {
+        doSpeak();
+      }
     });
   };
 
