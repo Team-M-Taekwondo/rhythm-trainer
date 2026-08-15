@@ -335,6 +335,7 @@
     countdown: "Ready",
     switch: "Switch",
     relax: "Suh",
+    done: "Complete",
   };
 
   // Taegeuk 1–8 get their number appended on the run screen, so color belts who
@@ -413,6 +414,10 @@
           elTitle.textContent = poomTitle(label, num);
         } else if (phase === "go") {
           elCount.textContent = "1";
+        } else if (phase === "done") {
+          elCount.textContent = "✓";
+          elMax.textContent = "";
+          elTitle.textContent = "Well done";
         } else if (
           phase === "joonbi" ||
           phase === "sijak" ||

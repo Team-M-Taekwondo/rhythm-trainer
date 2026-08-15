@@ -240,14 +240,12 @@
     });
   }
 
-  // Spoken get-ready countdown number in ENGLISH in place of beeps — only 1–5
-  // are voiced. Fire-and-forget so it overlaps the 1s wait. Speech (not Web
-  // Audio) keeps a following spoken cue like "Sijak" audible on iOS.
-  const EN_COUNT = ["one", "two", "three", "four", "five"];
+  // Spoken get-ready countdown number (Korean Yuna, native numbers 하나…다섯) in
+  // place of beeps — only 1–5 are voiced. Fire-and-forget so it overlaps the 1s
+  // wait. Speech (not Web Audio) keeps a following spoken cue audible on iOS.
   function sayCountdown(r, settings) {
     if (settings && settings.voice && r >= 1 && r <= 5) {
-      // Natural, slightly-slow English voice (not the deep/fast Yuna tuning).
-      MT.speak(EN_COUNT[r - 1], { lang: "en-US", absolute: true, rate: 0.85, pitch: 1.0 });
+      MT.speak(MT.KO_NUMBERS[r - 1]); // Korean Yuna, natural tuning
     }
   }
 
@@ -275,6 +273,15 @@
     cb.onPhase("sijak", "Sijak");
     await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
   }
+  // Rest countdown with no trailing "Sijak" — used after the final set.
+  async function drillFinalRest(seconds, player, cb, settings) {
+    for (let r = seconds; r > 0; r--) {
+      if (stopped(player)) return;
+      cb.onPhase("rest", "Rest", r);
+      sayCountdown(r, settings);
+      await wait(1, player);
+    }
+  }
   async function runDrill(session, player, cb, settings) {
     const drill = session.items[0];
     // The drill has no spoken cue to revive the audio clock, so make sure it's
@@ -291,6 +298,12 @@
       if (player.cancelled) return;
       if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings);
     }
+    // After the last set: run the selected rest time, then announce completion.
+    if (player.cancelled) return;
+    if (session.restSeconds > 0) await drillFinalRest(session.restSeconds, player, cb, settings);
+    if (player.cancelled) return;
+    cb.onPhase("done", "Complete");
+    await say("The drill has completed", player, settings, { lang: "en-US", absolute: true, rate: 0.95, pitch: 1.0 });
   }
 
   // One full poomsae: [announce] → Joonbi → count → Sijak → clip/metronome →
