@@ -115,26 +115,52 @@
     o.stop(t + dur + 0.02);
   }
 
-  // Each voice: (time, accent, bus)
+  // Each voice: (time, accent, bus). Gains sit a bit hot on purpose — the
+  // tempo sound has to cut through a noisy gym floor.
   const VOICES = {
     woodblock(t, accent, bus) {
       const f = accent ? 1250 : 1000;
-      tone(t, 0.05, "triangle", f, f * 0.6, accent ? 0.9 : 0.6, bus);
-      noiseSource(t, 0.02, "bandpass", f * 1.6, 8, accent ? 0.5 : 0.3, bus);
+      tone(t, 0.05, "triangle", f, f * 0.6, accent ? 1.0 : 0.75, bus);
+      noiseSource(t, 0.02, "bandpass", f * 1.6, 8, accent ? 0.6 : 0.4, bus);
     },
     beep(t, accent, bus) {
-      tone(t, 0.09, "sine", accent ? 1320 : 880, null, accent ? 0.85 : 0.55, bus);
+      tone(t, 0.09, "sine", accent ? 1320 : 880, null, accent ? 1.0 : 0.7, bus);
     },
     drum(t, accent, bus) {
-      tone(t, 0.18, "sine", accent ? 220 : 170, 55, accent ? 1.0 : 0.8, bus);
-      noiseSource(t, 0.05, "lowpass", 900, 0, accent ? 0.5 : 0.35, bus);
+      tone(t, 0.18, "sine", accent ? 220 : 170, 55, accent ? 1.0 : 0.95, bus);
+      noiseSource(t, 0.05, "lowpass", 900, 0, accent ? 0.6 : 0.45, bus);
     },
     click(t, accent, bus) {
-      noiseSource(t, 0.015, "highpass", accent ? 3500 : 2600, 0, accent ? 0.6 : 0.4, bus);
+      noiseSource(t, 0.015, "highpass", accent ? 3500 : 2600, 0, accent ? 0.75 : 0.5, bus);
     },
     clave(t, accent, bus) {
-      tone(t, 0.04, "square", accent ? 2200 : 1800, null, accent ? 0.55 : 0.4, bus);
+      tone(t, 0.04, "square", accent ? 2200 : 1800, null, accent ? 0.7 : 0.5, bus);
     },
+  };
+
+  // Finish chime — an unmistakable "drill over" bell: a slow rising major
+  // triad with long ringing decays, much bigger than the milestone triple-beep.
+  MT.playFinishChime = function (bus) {
+    ensureContext();
+    keepAlive();
+    const out = bus || master;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notes.forEach((f, i) => {
+      const at = ctx.currentTime + 0.05 + i * 0.28;
+      [1, 2.01, 3.02].forEach((h, hi) => {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(f * h, at);
+        const g = ctx.createGain();
+        const peak = (hi === 0 ? 0.9 : hi === 1 ? 0.25 : 0.12) * (i === notes.length - 1 ? 1.1 : 0.9);
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.linearRampToValueAtTime(Math.min(1, peak), at + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + (i === notes.length - 1 ? 2.2 : 1.2));
+        o.connect(g).connect(out);
+        o.start(at);
+        o.stop(at + 2.4);
+      });
+    });
   };
 
   // Milestone marker for the drill — a bright ascending triple-beep on every
@@ -227,6 +253,78 @@
     return g;
   };
 
+  /* -------------------- Bundled voice clips --------------------
+     Pre-recorded audio for the small fixed vocabulary (numbers, commands,
+     poomsae names). When a clip exists in audio/voice/, MT.speak plays it
+     through Web Audio instead of SpeechSynthesis — identical natural sound on
+     every device, and no iOS speech-engine fights with the metronome.
+     Missing files are skipped silently and TTS covers them (fallback).
+     Generate the set with tools/generate-voice.sh. */
+  const VOICE_FILES = {
+    "하나": "n1", "둘": "n2", "셋": "n3", "넷": "n4", "다섯": "n5",
+    "여섯": "n6", "일곱": "n7", "여덟": "n8", "아홉": "n9", "열": "n10",
+    "준비": "joonbi", "시작": "sijak", "바로": "baro", "서": "suh",
+    "태극 일장": "p1", "태극 이장": "p2", "태극 삼장": "p3", "태극 사장": "p4",
+    "태극 오장": "p5", "태극 육장": "p6", "태극 칠장": "p7", "태극 팔장": "p8",
+    "고려": "p9", "금강": "p10", "태백": "p11", "평원": "p12",
+    "십진": "p13", "지태": "p14", "천권": "p15",
+    "The drill has completed": "complete",
+  };
+  const VOICE_CACHE = new Map(); // file key -> AudioBuffer
+  const VOICE_PENDING = new Map(); // file key -> ArrayBuffer (fetched, not decoded)
+  let voiceSrc = null; // currently playing clip (so cancelSpeech can stop it)
+
+  MT.loadVoiceClips = async function () {
+    ensureContext();
+    const keys = Array.from(new Set(Object.values(VOICE_FILES)));
+    await Promise.all(
+      keys.map(async (k) => {
+        if (VOICE_CACHE.has(k) || VOICE_PENDING.has(k)) return;
+        try {
+          const r = await fetch("audio/voice/" + k + ".m4a");
+          if (r.ok) VOICE_PENDING.set(k, await r.arrayBuffer());
+        } catch (e) {}
+      })
+    );
+    await decodeVoicePending();
+  };
+
+  // Like the repo clips: iOS can't decode while suspended, so retry on unlock.
+  async function decodeVoicePending() {
+    if (!ctx || !VOICE_PENDING.size) return;
+    for (const [k, buf] of Array.from(VOICE_PENDING.entries())) {
+      try {
+        VOICE_CACHE.set(k, await ctx.decodeAudioData(buf.slice(0)));
+        VOICE_PENDING.delete(k);
+      } catch (e) {}
+    }
+  }
+
+  function playVoiceClip(text) {
+    const key = VOICE_FILES[text];
+    const buf = key && VOICE_CACHE.get(key);
+    if (!buf) return null;
+    keepAlive();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = 1.0;
+    src.connect(g).connect(master);
+    src.start();
+    voiceSrc = src;
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (voiceSrc === src) voiceSrc = null;
+        resolve();
+      };
+      src.onended = finish;
+      setTimeout(finish, buf.duration * 1000 + 800); // safety net
+    });
+  }
+
   /* -------------------- Voice cues -------------------- */
 
   // Rank Korean voices by likely quality. Network / named / "enhanced" voices
@@ -313,6 +411,12 @@
   // opts.rate / opts.pitch are per-call multipliers on top of the global tuning.
   MT.speak = function (text, opts) {
     opts = opts || {};
+    // Bundled clip first — natural, consistent, and Web-Audio friendly.
+    if (text && VOICE_FILES[text]) {
+      ensureContext();
+      const p = playVoiceClip(text);
+      if (p) return p;
+    }
     return new Promise((resolve) => {
       if (!window.speechSynthesis || !text) return resolve();
       primeSpeechOnce(); // absorb iOS's first-utterance drop
@@ -354,6 +458,10 @@
 
   MT.cancelSpeech = function () {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (voiceSrc) {
+      try { voiceSrc.stop(); } catch (e) {}
+      voiceSrc = null;
+    }
   };
 
   /* ============================================================
@@ -508,7 +616,10 @@
       }
     }
   }
-  MT.decodePendingClips = decodePending;
+  MT.decodePendingClips = function () {
+    decodeVoicePending();
+    return decodePending();
+  };
 
   // Start playing a stored clip through `bus`; returns the source node
   // (caller manages onended / stop), or null if there's no clip.

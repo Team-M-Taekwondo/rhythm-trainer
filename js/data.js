@@ -26,6 +26,18 @@
   MT.KO_NUMBERS = ["하나", "둘", "셋", "넷", "다섯"];
   // 1..8 for tension movements: hana … yeodeol
   MT.KO_NUMBERS_8 = ["하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟"];
+  // 1..10 for the Counting drill: hana … yeol
+  MT.KO_NUMBERS_10 = ["하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟", "아홉", "열"];
+
+  // Counting-drill word for rep n. Counts run in tens: 1–10 normally, then each
+  // new ten leads with its decade number instead of "1" (11→둘, 21→셋, 31→넷…)
+  // and every ten closes on 열. Only the words 1–10 are ever needed.
+  MT.countWord = function (n) {
+    const ones = n % 10;
+    if (ones === 0) return MT.KO_NUMBERS_10[9]; // 10 / 20 / 30 … all close on 열
+    if (ones === 1 && n > 10) return MT.KO_NUMBERS_10[Math.ceil(n / 10) - 1];
+    return MT.KO_NUMBERS_10[ones - 1];
+  };
 
   // Available metronome sounds (synthesized in audio.js — no files needed).
   MT.SOUNDS = [
@@ -34,6 +46,33 @@
     { id: "drum", label: "Drum" },
     { id: "click", label: "Soft click" },
     { id: "clave", label: "Clave" },
+  ];
+
+  /* -------------------- Preset drills --------------------
+     The team's common training drills, variables pre-set. Levels change only
+     the tempo: Color +0.1s, Black as listed, Competition Black −0.1s.
+     end: "announce" = final rest + spoken completion (like the custom drill);
+          "chime"    = no rest after the last set, just the finish chime. */
+  MT.PRESET_LEVELS = [
+    { id: "color", label: "Color Belts", delta: 0.1 },
+    { id: "black", label: "Black Belts", delta: 0 },
+    { id: "comp", label: "Comp. Black", delta: -0.1 },
+  ];
+  MT.PRESET_DRILLS = [
+    { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, end: "announce" },
+    { id: "round",  group: "Ground drills",   name: "Round House Kicks", tempo: 0.9, reps: 15, rest: 10, sets: 4, end: "announce" },
+    { id: "side",   group: "Ground drills",   name: "Side Kicks",        tempo: 1.1, reps: 15, rest: 10, sets: 4, end: "announce" },
+    { id: "horse",  group: "Standing drills", name: "Horse Stance · Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4, end: "chime" },
+    { id: "inplace", group: "Standing drills", name: "All Stances · In Place · Blocks/Attacks",     tempo: 1.0, reps: 20, rest: 10, sets: 4, end: "chime" },
+    { id: "udblock", group: "Standing drills", name: "All Stances · Up/Down · Blocks",              tempo: 1.5, reps: 20, rest: 10, sets: 4, end: "chime" },
+    { id: "udattack", group: "Standing drills", name: "All Stances · Up/Down · Attacks",            tempo: 1.4, reps: 20, rest: 10, sets: 4, end: "chime" },
+  ];
+
+  // Counting drill: seconds between counts. Presets match the common kicks.
+  MT.COUNT_INTERVALS = [
+    { v: 2.0, label: "Front kick" },
+    { v: 2.3, label: "Round house" },
+    { v: 2.5, label: "Side kick" },
   ];
 
   // Belt sections. Divisions apply to Black Belt only.

@@ -67,6 +67,21 @@
     if (runTop) runTop.insertBefore(mk("run-top-logo"), runTop.querySelector(".run-meta"));
   })();
 
+  /* -------------------- home button on every screen --------------------
+     Quick way back to the home screen from anywhere (the run screen already
+     has its own exit ×). Routed through the same data-goto click handler. */
+  (function stampHomeButtons() {
+    $$(".topbar").forEach((bar) => {
+      const b = document.createElement("button");
+      b.className = "icon-btn home-btn";
+      b.dataset.goto = "home";
+      b.setAttribute("aria-label", "Home");
+      b.innerHTML =
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>';
+      bar.appendChild(b);
+    });
+  })();
+
   /* -------------------- screen routing -------------------- */
   function show(name) {
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
@@ -82,6 +97,8 @@
       if (dest === "settings") renderSettings();
       if (dest === "build-forms") renderFormsBuilder();
       if (dest === "build-drill") renderDrillBuilder();
+      if (dest === "preset-drills") renderPresetList();
+      if (dest === "build-count") renderCountBuilder();
       if (dest === "randomizer") renderRandomizer();
       show(dest);
     }
@@ -235,10 +252,11 @@
 
   $("#start-drill").addEventListener("click", () => {
     MT.unlockAudio();
+    const tempo = Number($("#drill-tempo").value);
     const drill = {
       name: "Drill",
       reps: Math.max(1, Number($("#drill-reps").value) || 1),
-      duration: Number($("#drill-tempo").value),
+      duration: tempo,
       sound: drillSound,
     };
     startRun({
@@ -246,6 +264,141 @@
       items: [MT.drillToItem(drill)],
       sets: Math.max(1, Number($("#drill-sets").value) || 1),
       restSeconds: Math.max(0, Number($("#drill-rest").value) || 0),
+      tempoLabel: tempo.toFixed(1) + "s / rep",
+    });
+  });
+
+  /* -------------------- PRESET DRILLS (Team Presets) -------------------- */
+  let presetLevel = "black";
+  let presetDrill = null; // the preset opened on the config screen
+
+  const levelDelta = () =>
+    (MT.PRESET_LEVELS.find((l) => l.id === presetLevel) || {}).delta || 0;
+  // Level moves tempo only; snap to the 0.1s grid the tempo select uses.
+  const levelTempo = (base) => Math.max(0.1, Math.round((base + levelDelta()) * 10) / 10);
+
+  function renderLevelSeg(sel) {
+    $(sel).innerHTML = MT.PRESET_LEVELS.map(
+      (l) =>
+        `<button class="seg-btn ${l.id === presetLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
+    ).join("");
+  }
+  function renderPresetList() {
+    renderLevelSeg("#preset-level");
+    const groups = [];
+    MT.PRESET_DRILLS.forEach((d) => {
+      let g = groups.find((x) => x.name === d.group);
+      if (!g) groups.push((g = { name: d.group, drills: [] }));
+      g.drills.push(d);
+    });
+    $("#preset-list").innerHTML = groups
+      .map(
+        (g) => `
+      <div class="panel">
+        <h2>${g.name}</h2>
+        <div class="checklist">
+          ${g.drills
+            .map(
+              (d) => `
+            <button class="preset-row" data-preset="${d.id}">
+              <span class="pr-name">${d.name}</span>
+              <span class="pr-meta">${levelTempo(d.tempo).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest</span>
+            </button>`
+            )
+            .join("")}
+        </div>
+      </div>`
+      )
+      .join("");
+  }
+  $("#preset-level").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-level]");
+    if (!b) return;
+    presetLevel = b.dataset.level;
+    renderPresetList();
+  });
+  $("#preset-list").addEventListener("click", (e) => {
+    const row = e.target.closest("[data-preset]");
+    if (!row) return;
+    openPresetConfig(row.dataset.preset);
+  });
+  function openPresetConfig(id) {
+    const d = MT.PRESET_DRILLS.find((x) => x.id === id);
+    if (!d) return;
+    presetDrill = d;
+    $("#preset-title").textContent = d.name;
+    renderLevelSeg("#preset-cfg-level");
+    fillTempoSelect($("#preset-tempo"), levelTempo(d.tempo), "", MT.DRILL_TEMPOS);
+    $("#preset-reps").value = d.reps;
+    $("#preset-sets").value = d.sets;
+    $("#preset-rest").value = d.rest;
+    $("#preset-rounds").value = 1;
+    show("preset-config");
+  }
+  $("#preset-cfg-level").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-level]");
+    if (!b || !presetDrill) return;
+    presetLevel = b.dataset.level;
+    renderLevelSeg("#preset-cfg-level");
+    $("#preset-tempo").value = levelTempo(presetDrill.tempo);
+  });
+  $("#start-preset").addEventListener("click", () => {
+    if (!presetDrill) return;
+    MT.unlockAudio();
+    const tempo = Number($("#preset-tempo").value);
+    const setsPerRound = Math.max(1, Number($("#preset-sets").value) || 1);
+    const rounds = Math.max(1, Number($("#preset-rounds").value) || 1);
+    startRun({
+      kind: "drill",
+      items: [
+        MT.drillToItem({
+          name: presetDrill.name,
+          reps: Math.max(1, Number($("#preset-reps").value) || 1),
+          duration: tempo,
+          sound: "woodblock",
+        }),
+      ],
+      sets: setsPerRound * rounds,
+      setsPerRound,
+      rounds,
+      restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
+      endMode: presetDrill.end,
+      tempoLabel: tempo.toFixed(1) + "s / rep",
+    });
+  });
+
+  /* -------------------- KOREAN COUNTING builder -------------------- */
+  let countInterval = 2.0;
+  function renderCountBuilder() {
+    renderCountChips();
+    fillTempoSelect($("#count-custom"), countInterval, "", MT.DRILL_TEMPOS);
+  }
+  function renderCountChips() {
+    $("#count-intervals").innerHTML = MT.COUNT_INTERVALS.map(
+      (i) =>
+        `<button class="sound-chip ${Math.abs(i.v - countInterval) < 0.001 ? "active" : ""}" data-int="${i.v}">${i.v.toFixed(1)}s · ${i.label}</button>`
+    ).join("");
+  }
+  $("#count-intervals").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-int]");
+    if (!chip) return;
+    countInterval = Number(chip.dataset.int);
+    renderCountChips();
+    $("#count-custom").value = countInterval;
+  });
+  $("#count-custom").addEventListener("change", (e) => {
+    countInterval = Number(e.target.value);
+    renderCountChips(); // active chip follows only if it matches a preset
+  });
+  $("#start-count").addEventListener("click", () => {
+    MT.unlockAudio();
+    startRun({
+      kind: "count",
+      target: Math.max(1, Number($("#count-target").value) || 10),
+      interval: countInterval,
+      sets: Math.max(1, Number($("#count-sets").value) || 1),
+      restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
+      tempoLabel: countInterval.toFixed(1) + "s / count",
     });
   });
 
@@ -338,6 +491,28 @@
     done: "Complete",
   };
 
+  /* -------- keep the screen awake during a session (Screen Wake Lock) -------- */
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if ("wakeLock" in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+      }
+    } catch (e) {}
+  }
+  function releaseWakeLock() {
+    try { if (wakeLock) wakeLock.release(); } catch (e) {}
+    wakeLock = null;
+  }
+  // The lock drops when the tab is hidden — re-acquire it when we come back,
+  // but only while a run is still on screen.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && document.body.classList.contains("running")) {
+      requestWakeLock();
+    }
+  });
+
   // Taegeuk 1–8 get their number appended on the run screen, so color belts who
   // don't know the Korean name can still recognize which poomsae it is.
   function poomTitle(name, id) {
@@ -359,6 +534,7 @@
     currentSession = session;
     show("run");
     document.body.classList.add("running");
+    requestWakeLock(); // keep the screen on during training
     setPauseUI(false);
     const elCount = $("#run-count");
     const elMax = $("#run-countmax");
@@ -374,10 +550,20 @@
     setBar(0);
     elCount.textContent = "0";
     elMax.textContent = "";
+    // Show the tempo this session runs at (drills & counting).
+    $("#run-tempo").textContent = session.tempoLabel || "";
 
     MT.runSession(session, {
       onItem(info) {
-        elSet.textContent = `Set ${info.set} / ${info.sets}`;
+        // Preset drills run rounds × sets; show both when rounds are in play.
+        const spr = session.setsPerRound;
+        if (spr && session.rounds > 1) {
+          const round = Math.ceil(info.set / spr);
+          const setIn = ((info.set - 1) % spr) + 1;
+          elSet.textContent = `Round ${round}/${session.rounds} · Set ${setIn}/${spr}`;
+        } else {
+          elSet.textContent = `Set ${info.set} / ${info.sets}`;
+        }
         elItem.textContent =
           info.items > 1 ? `${info.item} / ${info.items}` : "";
         elTitle.textContent = poomTitle(info.name, info.id);
@@ -387,7 +573,8 @@
         document.body.dataset.phase = phase;
         elPhase.textContent = PHASE_LABELS[phase] || label;
         // The bar is scrubbable only during the performance ("go") phase.
-        const seekable = phase === "go";
+        // Counting sessions can't seek (speech-driven), so no thumb there.
+        const seekable = phase === "go" && session.kind !== "count";
         progressBar.classList.toggle("scrubbable", seekable);
         if (!seekable) {
           scrubbing = false;
@@ -454,12 +641,14 @@
         elCount.textContent = "✓";
         elMax.textContent = "";
         document.body.dataset.phase = "done";
+        releaseWakeLock(); // session over — let the screen sleep normally again
       },
     });
   }
 
   function exitRun() {
     MT.stopSession();
+    releaseWakeLock();
     document.body.classList.remove("running");
     document.body.dataset.phase = "";
     show("home");
@@ -865,4 +1054,6 @@
   // uploads (which take precedence for authoring/preview).
   if (MT.loadClips) MT.loadClips().then(() => MT.loadRepoClips && MT.loadRepoClips());
   else if (MT.loadRepoClips) MT.loadRepoClips();
+  // Bundled voice clips (numbers/commands/names) — natural Yuna recordings.
+  if (MT.loadVoiceClips) MT.loadVoiceClips();
 })();

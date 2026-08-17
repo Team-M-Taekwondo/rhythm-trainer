@@ -82,7 +82,7 @@
           }
           acc += Math.max(0, (c.duration || N) - N);
         } else {
-          events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent, mark: c.mark });
+          events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent, mark: c.mark, cd: c.cd });
           acc += Math.max(0.1, c.duration);
         }
       });
@@ -124,6 +124,15 @@
           if (settings && settings.voice && e.kind === "tension") {
             const id = setTimeout(() => {
               if (!player.cancelled) MT.speak(MT.KO_NUMBERS_8[e.k - 1], { rate: 1.0 });
+            }, Math.max(0, (at - MT.now()) * 1000));
+            speechTimers.push(id);
+            player.timers.push(id);
+          }
+          // Drill end-of-set countdown: the last 4 reps are spoken in Korean
+          // (넷/셋/둘/하나) on the beat, so athletes hear the set closing out.
+          if (settings && settings.voice && e.kind === "beat" && e.cd) {
+            const id = setTimeout(() => {
+              if (!player.cancelled) MT.speak(MT.KO_NUMBERS[e.cd - 1], { rate: 1.0 });
             }, Math.max(0, (at - MT.now()) * 1000));
             speechTimers.push(id);
             player.timers.push(id);
@@ -294,16 +303,58 @@
       if (s === 0) await drillCountdown(player, cb, settings);
       if (player.cancelled) return;
       cb.onPhase("go", drill.name);
+      // First count lands one tempo interval after "Sijak", so the set opens
+      // at the same pace it runs.
+      await wait(drill.counts.length ? drill.counts[0].duration : 0, player);
       await runCounts(drill.counts, drill.sound, player, cb, settings);
       if (player.cancelled) return;
       if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings);
     }
-    // After the last set: run the selected rest time, then announce completion.
     if (player.cancelled) return;
+    if (session.endMode === "chime") {
+      // Standing drills: no rest after the final set — the finish chime rings
+      // right away so it's obvious the drill is over.
+      cb.onPhase("done", "Complete");
+      MT.playFinishChime();
+      await wait(2.4, player); // let the bell ring out before onDone
+      return;
+    }
+    // Default (ground/custom): run the selected rest time, then announce completion.
     if (session.restSeconds > 0) await drillFinalRest(session.restSeconds, player, cb, settings);
     if (player.cancelled) return;
     cb.onPhase("done", "Complete");
     await say("The drill has completed", player, settings, { lang: "en-US", absolute: true, rate: 0.95, pitch: 1.0 });
+  }
+
+  /* ---- Counting drill: spoken Korean counting for instructor-called drills.
+     3-2-1 → Sijak → count 1..target (decade style: 11→둘, 21→셋 …) at the chosen
+     interval → 10s rest with spoken countdown → next set. Ends with the chime,
+     no rest after the final set. ---- */
+  async function runCounting(session, player, cb, settings) {
+    if (MT.resumeAudio) MT.resumeAudio();
+    for (let s = 0; s < session.sets; s++) {
+      if (player.cancelled) return;
+      player.skip = false; // a Skip advances to the next set
+      cb.onItem({ set: s + 1, sets: session.sets, item: 1, items: 1, name: "Counting" });
+      if (s === 0) await drillCountdown(player, cb, settings);
+      if (player.cancelled) return;
+      cb.onPhase("go", "Counting");
+      // First count comes a fixed 1s after "Sijak" (drills use their tempo).
+      await wait(1, player);
+      for (let n = 1; n <= session.target; n++) {
+        if (stopped(player)) break;
+        cb.onCount(n, session.target);
+        cb.onProgress(n / session.target);
+        if (settings.voice) MT.speak(MT.countWord(n), { rate: 1.0 }); // fire-and-forget: keeps the interval steady
+        await wait(session.interval, player);
+      }
+      if (player.cancelled) return;
+      if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings);
+    }
+    if (player.cancelled) return;
+    cb.onPhase("done", "Complete");
+    MT.playFinishChime();
+    await wait(2.4, player);
   }
 
   // One full poomsae: [announce] → Joonbi → count → Sijak → clip/metronome →
@@ -413,8 +464,9 @@
     MT._current = player;
     MT.unlockAudio();
 
-    if (session.kind === "drill" || session.kind === "mixed") {
+    if (session.kind === "drill" || session.kind === "mixed" || session.kind === "count") {
       if (session.kind === "drill") await runDrill(session, player, cb, settings);
+      else if (session.kind === "count") await runCounting(session, player, cb, settings);
       else await runMixed(session, player, cb, settings);
       const wc = player.cancelled;
       try {
@@ -558,8 +610,17 @@
   MT.drillToItem = function (drill) {
     const counts = [];
     for (let i = 0; i < drill.reps; i++) {
-      // Mark the LAST rep so the milestone triple-beep fires at the end of the set.
-      counts.push({ n: i + 1, duration: drill.duration, accent: false, mark: i + 1 === drill.reps });
+      const n = i + 1;
+      const left = drill.reps - n + 1; // reps remaining including this one
+      counts.push({
+        n,
+        duration: drill.duration,
+        accent: false,
+        // Mark the LAST rep so the milestone triple-beep fires at the end of the set.
+        mark: n === drill.reps,
+        // Spoken Korean countdown (4-3-2-1) over the final four reps.
+        cd: left <= 4 ? left : 0,
+      });
     }
     return {
       type: "drill",
