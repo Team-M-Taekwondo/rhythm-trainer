@@ -82,6 +82,24 @@
     });
   })();
 
+  /* -------------------- last-updated stamp --------------------
+     document.lastModified is the HTML's Last-Modified header (GitHub Pages
+     sends the deploy time), already converted to the viewer's local time.
+     The HTML is never cached (no-cache metas) and changes every deploy
+     (?v= bump), so this always reflects the latest update — no manual bump. */
+  (function showLastUpdated() {
+    const el = $("#app-updated");
+    if (!el) return;
+    const d = new Date(document.lastModified);
+    if (isNaN(d.getTime())) return;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let h = d.getHours();
+    const ap = h >= 12 ? "pm" : "am";
+    h = h % 12 || 12;
+    const min = String(d.getMinutes()).padStart(2, "0");
+    el.textContent = `Last updated on ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} @ ${h}:${min} ${ap}`;
+  })();
+
   /* -------------------- screen routing -------------------- */
   function show(name) {
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));

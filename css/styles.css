@@ -78,6 +78,7 @@ button { font-family: inherit; touch-action: manipulation; }
   color: var(--gold); letter-spacing: 0.24em; text-transform: uppercase;
   font-size: 12px; margin: 10px 0 0; font-weight: 700;
 }
+.app-updated { color: var(--muted); font-size: 11.5px; margin: 8px 0 0; opacity: 0.85; }
 
 .home-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px;
