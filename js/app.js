@@ -548,8 +548,12 @@
   }
 
   let currentSession = null;
+  let runFromScreen = "home"; // where Stop/× returns to — the screen that launched the run
   function startRun(session) {
     currentSession = session;
+    const active = document.querySelector(".screen.active");
+    // A restart re-enters from the run screen itself — keep the original origin.
+    if (active && active.dataset.screen !== "run") runFromScreen = active.dataset.screen;
     show("run");
     document.body.classList.add("running");
     requestWakeLock(); // keep the screen on during training
@@ -669,7 +673,7 @@
     releaseWakeLock();
     document.body.classList.remove("running");
     document.body.dataset.phase = "";
-    show("home");
+    show(runFromScreen);
   }
   function restartRun() {
     if (!currentSession) return;
