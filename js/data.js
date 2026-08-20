@@ -162,8 +162,21 @@
     try {
       all = JSON.parse(localStorage.getItem(CLIPMETA_KEY) || "{}");
     } catch (e) {}
-    all[key] = Object.assign({}, all[key], meta);
+    const merged = Object.assign({}, all[key], meta);
+    // A null/undefined value clears that field; an empty record is dropped.
+    Object.keys(merged).forEach((k) => {
+      if (merged[k] == null) delete merged[k];
+    });
+    if (Object.keys(merged).length) all[key] = merged;
+    else delete all[key];
     localStorage.setItem(CLIPMETA_KEY, JSON.stringify(all));
+  };
+  MT.getAllClipMeta = function () {
+    try {
+      return JSON.parse(localStorage.getItem(CLIPMETA_KEY) || "{}");
+    } catch (e) {
+      return {};
+    }
   };
 
   // Approximate official movement counts — PLACEHOLDER rhythm.

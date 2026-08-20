@@ -802,6 +802,7 @@
     $("#clip-play").disabled = !has;
     $("#clip-delete").disabled = !has;
     stopClipPreview();
+    updateSpeedUI();
   }
   $("#clip-file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
@@ -821,6 +822,7 @@
       return;
     }
     MT.unlockAudio();
+    stopSpeedPreview();
     const src = MT.playClip(editorSection, editorDiv(), editorForm.id, null);
     if (src) {
       clipPreviewSrc = src;
@@ -833,6 +835,93 @@
       await MT.deleteClip(editorSection, editorDiv(), editorForm.id);
     }
     updateClipUI();
+  });
+
+  /* ---- Speed match: this division plays the U30 base audio at an
+     adjusted speed (per poomsae). The U30 recording itself is untouched;
+     the match is just a playback-rate multiplier stored per division. ---- */
+  let speedPreviewSrc = null;
+  const speedKey = () => MT.clipKey(editorSection, editorDiv(), editorForm.id);
+  const speedVal = () => Number($("#speed-range").value) || 1;
+  function stopSpeedPreview() {
+    if (speedPreviewSrc) {
+      try {
+        speedPreviewSrc.stop();
+      } catch (e) {}
+    }
+    speedPreviewSrc = null;
+    $("#speed-preview").textContent = "Preview";
+  }
+  function setSpeedLabel() {
+    const rate = speedVal();
+    $("#speed-val").textContent = rate.toFixed(2) + "×";
+    if (!editorForm || !MT.hasClip("black", "u30", editorForm.id)) return;
+    const base = MT.clipDuration("black", "u30", editorForm.id);
+    const pct = Math.round((rate - 1) * 100);
+    $("#speed-len").textContent =
+      (pct === 0 ? "Same speed as U30" : pct > 0 ? pct + "% faster than U30" : -pct + "% slower than U30") +
+      " — plays in " + (base / rate).toFixed(1) + "s (U30: " + base.toFixed(1) + "s).";
+  }
+  function updateSpeedUI() {
+    stopSpeedPreview();
+    const panel = $("#speed-panel");
+    const isBase = editorSection === "black" && editorDivision === "u30";
+    const hasBase = editorForm && MT.hasClip("black", "u30", editorForm.id);
+    panel.hidden = isBase || !hasBase;
+    if (panel.hidden) return;
+    const key = speedKey();
+    const local = Number((MT.getClipMeta(key) || {}).speed) || 0;
+    const repo = MT.repoTempoSpeed ? MT.repoTempoSpeed(key) : 0;
+    $("#speed-range").value = local || repo || 1;
+    $("#speed-clear").disabled = !local;
+    const target = editorSection === "black" ? "Black · " + editorDivision : "Color Belt";
+    const ownNote = MT.hasClip(editorSection, editorDiv(), editorForm.id)
+      ? " (overrides this division's own clip)"
+      : "";
+    $("#speed-status").textContent = local
+      ? "✓ Match saved on this device (" + local.toFixed(2) + "×) — " + target +
+        " plays the U30 audio at this speed" + ownNote + "."
+      : repo
+        ? "Published match (" + repo.toFixed(2) + "×) — " + target +
+          " plays the U30 audio at this speed" + ownNote + "."
+        : "No match yet for " + target + ".";
+    setSpeedLabel();
+  }
+  function nudgeSpeed(d) {
+    const r = Math.max(0.7, Math.min(1.3, Math.round((speedVal() + d) * 100) / 100));
+    $("#speed-range").value = r;
+    setSpeedLabel();
+    // Live-adjust a running preview so he can dial it in by ear.
+    if (speedPreviewSrc) speedPreviewSrc.playbackRate.value = r;
+  }
+  $("#speed-range").addEventListener("input", () => {
+    setSpeedLabel();
+    if (speedPreviewSrc) speedPreviewSrc.playbackRate.value = speedVal();
+  });
+  $("#speed-minus").addEventListener("click", () => nudgeSpeed(-0.01));
+  $("#speed-plus").addEventListener("click", () => nudgeSpeed(0.01));
+  $("#speed-preview").addEventListener("click", () => {
+    if (speedPreviewSrc) return stopSpeedPreview();
+    if (!editorForm) return;
+    MT.unlockAudio();
+    stopClipPreview();
+    const src = MT.playClipAt("black", "u30", editorForm.id, null, 0, speedVal());
+    if (src) {
+      speedPreviewSrc = src;
+      $("#speed-preview").textContent = "Stop";
+      src.onended = stopSpeedPreview;
+    }
+  });
+  $("#speed-save").addEventListener("click", () => {
+    if (!editorForm) return;
+    MT.setClipMeta(speedKey(), { speed: speedVal() });
+    updateSpeedUI();
+    flash("#speed-save", "Saved ✓");
+  });
+  $("#speed-clear").addEventListener("click", () => {
+    if (!editorForm) return;
+    MT.setClipMeta(speedKey(), { speed: null });
+    updateSpeedUI();
   });
 
   function playSoundSample(soundId) {
@@ -964,23 +1053,51 @@
       files.push({ name: file, data: new Uint8Array(await blob.arrayBuffer()) });
       manifest.clips.push({ section, division, poomsae: id, file });
     }
-    files.push({
-      name: "data/clips.json",
-      data: new TextEncoder().encode(JSON.stringify(manifest, null, 2) + "\n"),
+    // Only ship clips.json when this device actually has uploads — an empty
+    // manifest would wipe the repo's shipped clips on unzip.
+    if (clips.length) {
+      files.push({
+        name: "data/clips.json",
+        data: new TextEncoder().encode(JSON.stringify(manifest, null, 2) + "\n"),
+      });
+    }
+    // Speed matches: the published map merged with this device's saved
+    // matches (local wins), so an export never loses already-published ones.
+    const tempo = new Map(MT.getRepoTempoMatches ? MT.getRepoTempoMatches() : []);
+    const metaAll = MT.getAllClipMeta ? MT.getAllClipMeta() : {};
+    Object.keys(metaAll).forEach((k) => {
+      const s = Number(metaAll[k] && metaAll[k].speed);
+      if (s > 0) tempo.set(k, s);
     });
-    return { blob: makeZip(files), count: clips.length, manifest };
+    const matches = Array.from(tempo.entries())
+      .map(([k, speed]) => {
+        const [section, division, idStr] = k.split("|");
+        return { section, division, poomsae: Number(idStr), speed };
+      })
+      .sort(
+        (a, b) =>
+          a.section.localeCompare(b.section) ||
+          a.division.localeCompare(b.division) ||
+          a.poomsae - b.poomsae
+      );
+    files.push({
+      name: "data/tempomap.json",
+      data: new TextEncoder().encode(JSON.stringify({ matches }, null, 2) + "\n"),
+    });
+    return { blob: makeZip(files), count: clips.length, matchCount: matches.length, manifest };
   }
   async function exportForGitHub() {
     $("#export-status").textContent = "Packaging…";
     try {
-      const { blob, count } = await buildExportZip();
-      if (!count) {
-        $("#export-status").textContent = "No clips uploaded yet — nothing to export.";
+      const { blob, count, matchCount } = await buildExportZip();
+      if (!count && !matchCount) {
+        $("#export-status").textContent = "Nothing to export yet — no clips or speed matches.";
         return;
       }
       downloadBlob(blob, "mteam-rhythm-data.zip");
       $("#export-status").textContent =
-        "Exported " + count + " clip(s) → mteam-rhythm-data.zip. Unzip into the project folder, then push.";
+        "Exported " + count + " clip(s) + " + matchCount +
+        " speed match(es) → mteam-rhythm-data.zip. Unzip into the project folder, then push.";
     } catch (e) {
       $("#export-status").textContent = "Export failed: " + e.message;
     }
@@ -1072,6 +1189,8 @@
   // uploads (which take precedence for authoring/preview).
   if (MT.loadClips) MT.loadClips().then(() => MT.loadRepoClips && MT.loadRepoClips());
   else if (MT.loadRepoClips) MT.loadRepoClips();
+  // Published speed matches (division → U30 base at an adjusted speed).
+  if (MT.loadTempoMap) MT.loadTempoMap();
   // Bundled voice clips (numbers/commands/names) — natural Yuna recordings.
   if (MT.loadVoiceClips) MT.loadVoiceClips();
 })();

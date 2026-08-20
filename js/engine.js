@@ -208,7 +208,15 @@
   function playClip(item, player, cb) {
     return new Promise((resolve) => {
       if (stopped(player)) return resolve();
-      const dur = MT.clipDuration(item.section, item.division, item.id);
+      // A speed match can redirect this division to the U30 base clip at an
+      // adjusted rate (see MT.resolveClip); otherwise it's the item's own clip.
+      const clip = MT.resolveClip
+        ? MT.resolveClip(item.section, item.division, item.id)
+        : { section: item.section, division: item.division, id: item.id, rate: 1 };
+      if (!clip) return resolve();
+      const rate = clip.rate || 1;
+      // Heard duration — the buffer plays `rate`× faster than real time.
+      const dur = MT.clipDuration(clip.section, clip.division, clip.id) / rate;
       if (!dur) return resolve();
       let src = null;
       let playStart = 0; // ctx time that maps to clip offset 0 (shifts on seek)
@@ -219,14 +227,15 @@
         player.seek = null;
         resolve();
       };
-      // (Re)start the clip from `offset` seconds. Web Audio can't seek a live
-      // source, so we stop the old one and start a fresh buffer at the offset.
+      // (Re)start the clip from `offset` HEARD seconds. Web Audio can't seek a
+      // live source, so we stop the old one and start a fresh buffer at the
+      // offset (converted to buffer seconds via the rate).
       function startAt(offset) {
         offset = Math.max(0, Math.min(dur - 0.05, offset));
         if (src) {
           try { src.onended = null; src.stop(); } catch (e) {}
         }
-        src = MT.playClipAt(item.section, item.division, item.id, player.bus, offset);
+        src = MT.playClipAt(clip.section, clip.division, clip.id, player.bus, offset * rate, rate);
         player.clipSrc = src;
         playStart = MT.now() - offset;
         if (src) src.onended = finish; // fires at the buffer's natural end
@@ -376,7 +385,7 @@
     await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
     if (stopped(player)) return;
     cb.onPhase("go", item.name);
-    if (item.section && MT.hasClip && MT.hasClip(item.section, item.division, item.id)) {
+    if (item.section && MT.resolveClip && MT.resolveClip(item.section, item.division, item.id)) {
       await playClip(item, player, cb);
     } else {
       await runCounts(item.counts, item.sound, player, cb, settings);

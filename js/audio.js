@@ -629,16 +629,69 @@
 
   // Same as playClip but starts at `offset` seconds into the clip (used for
   // scrubbing — Web Audio sources can't be seeked, so we restart at an offset).
-  MT.playClipAt = function (section, division, id, bus, offset) {
+  // `rate` speeds up (>1) or slows down (<1) playback — used by speed matches.
+  // `offset` is in BUFFER seconds (the recording's own timeline), not heard time.
+  MT.playClipAt = function (section, division, id, bus, offset, rate) {
     ensureContext();
     keepAlive();
     const buf = CLIP_CACHE.get(clipKey(section, division, id));
     if (!buf) return null;
     const src = ctx.createBufferSource();
     src.buffer = buf;
+    if (rate && rate !== 1) src.playbackRate.value = rate;
     src.connect(bus || master);
     src.start(0, Math.max(0, Math.min(buf.duration, offset || 0)));
     return src;
+  };
+
+  /* -------------------- Speed matches (U30 base) --------------------
+     Divisions other than U30 can reuse the U30 recording at an adjusted
+     speed instead of needing their own upload. A match maps a
+     (section, division, poomsae) to a playback speed on the U30 clip —
+     the U30 audio itself is never changed. Admin-set matches live in
+     localStorage (clip meta, field "speed"); published matches ship in
+     data/tempomap.json. A local match wins over the published one, and
+     any match wins over that division's own uploaded/shipped clip. */
+  const REPO_TEMPO = new Map(); // clipKey -> speed (e.g. 1.05 = 5% faster)
+
+  MT.loadTempoMap = async function () {
+    try {
+      const res = await fetch("data/tempomap.json?ts=" + Date.now());
+      if (!res.ok) return;
+      const m = await res.json();
+      ((m && m.matches) || []).forEach((c) => {
+        const s = Number(c.speed);
+        if (s > 0) REPO_TEMPO.set(clipKey(c.section, c.division || "", c.poomsae), s);
+      });
+    } catch (e) {}
+  };
+  MT.repoTempoSpeed = function (key) {
+    return REPO_TEMPO.get(key) || 0;
+  };
+  MT.getRepoTempoMatches = function () {
+    return Array.from(REPO_TEMPO.entries());
+  };
+
+  // The speed match for (section, division, id), or 0 when there is none.
+  MT.matchSpeed = function (section, division, id) {
+    if (section === "black" && division === "u30") return 0; // U30 IS the base
+    const key = clipKey(section, division, id);
+    const m = MT.getClipMeta ? MT.getClipMeta(key) : null;
+    if (m && Number(m.speed) > 0) return Number(m.speed);
+    return REPO_TEMPO.get(key) || 0;
+  };
+
+  // What actually plays for (section, division, id): a speed match redirects
+  // to the U30 base clip at its rate; otherwise the division's own clip at 1×.
+  MT.resolveClip = function (section, division, id) {
+    const speed = MT.matchSpeed(section, division, id);
+    if (speed && CLIP_CACHE.has(clipKey("black", "u30", id))) {
+      return { section: "black", division: "u30", id, rate: speed };
+    }
+    if (CLIP_CACHE.has(clipKey(section, division, id))) {
+      return { section, division, id, rate: 1 };
+    }
+    return null;
   };
 
   // Preview an unsaved uploaded file (Blob); returns { source, duration }.
