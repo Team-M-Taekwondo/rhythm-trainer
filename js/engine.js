@@ -269,7 +269,9 @@
 
   /* ---- Drill flow: no Joonbi/Baro. Spoken 3-2-1 countdown → Sijak → reps →
      rest (spoken countdown in the last 5s) → Sijak → next set. ---- */
-  async function drillCountdown(player, cb, settings) {
+  // cue: which command opens the first set — "sijak" (drills) or "joonbi"
+  // (general counting, where the instructor calls the start themselves).
+  async function drillCountdown(player, cb, settings, cue) {
     for (let n = 3; n >= 1; n--) {
       if (stopped(player)) return;
       cb.onPhase("countdown", "", n);
@@ -277,8 +279,13 @@
       await wait(1, player);
     }
     if (stopped(player)) return;
-    cb.onPhase("sijak", "Sijak");
-    await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+    if (cue === "joonbi") {
+      cb.onPhase("joonbi", "Joonbi");
+      await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+    } else {
+      cb.onPhase("sijak", "Sijak");
+      await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+    }
   }
   // cue: which command opens the next set — "sijak" (drills) or "joonbi"
   // (general counting, where the instructor calls the start themselves).
@@ -343,20 +350,19 @@
   }
 
   /* ---- Counting drill: spoken Korean counting for instructor-called drills.
-     3-2-1 → Sijak → count 1..target (decade style: 11→둘, 21→셋 …) at the chosen
-     interval → rest with spoken countdown → Joonbi → next set. Ends with the
-     chime, no rest after the final set. ---- */
+     3-2-1 → Joonbi → count 1..target (decade style: 11→둘, 21→셋 …) at the
+     chosen interval → rest with spoken countdown → Joonbi → next set. Ends with
+     the chime, no rest after the final set. ---- */
   async function runCounting(session, player, cb, settings) {
     if (MT.resumeAudio) MT.resumeAudio();
     for (let s = 0; s < session.sets; s++) {
       if (player.cancelled) return;
       player.skip = false; // a Skip advances to the next set
       cb.onItem({ set: s + 1, sets: session.sets, item: 1, items: 1, name: "Counting" });
-      if (s === 0) await drillCountdown(player, cb, settings);
+      if (s === 0) await drillCountdown(player, cb, settings, "joonbi");
       if (player.cancelled) return;
       cb.onPhase("go", "Counting");
-      // First count comes a fixed 1s after the opening cue — "Sijak" on the
-      // first set, "Joonbi" after a rest (drills use their tempo).
+      // First count comes a fixed 1s after "Joonbi" (drills use their tempo).
       await wait(1, player);
       for (let n = 1; n <= session.target; n++) {
         if (stopped(player)) break;
