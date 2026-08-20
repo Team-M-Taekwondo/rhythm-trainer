@@ -280,7 +280,9 @@
     cb.onPhase("sijak", "Sijak");
     await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
   }
-  async function drillRest(seconds, player, cb, settings) {
+  // cue: which command opens the next set — "sijak" (drills) or "joonbi"
+  // (general counting, where the instructor calls the start themselves).
+  async function drillRest(seconds, player, cb, settings, cue) {
     for (let r = seconds; r > 0; r--) {
       if (stopped(player)) return;
       cb.onPhase("rest", "Rest", r);
@@ -288,8 +290,13 @@
       await wait(1, player);
     }
     if (stopped(player)) return;
-    cb.onPhase("sijak", "Sijak");
-    await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+    if (cue === "joonbi") {
+      cb.onPhase("joonbi", "Joonbi");
+      await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+    } else {
+      cb.onPhase("sijak", "Sijak");
+      await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+    }
   }
   // Rest countdown with no trailing "Sijak" — used after the final set.
   async function drillFinalRest(seconds, player, cb, settings) {
@@ -337,8 +344,8 @@
 
   /* ---- Counting drill: spoken Korean counting for instructor-called drills.
      3-2-1 → Sijak → count 1..target (decade style: 11→둘, 21→셋 …) at the chosen
-     interval → 10s rest with spoken countdown → next set. Ends with the chime,
-     no rest after the final set. ---- */
+     interval → rest with spoken countdown → Joonbi → next set. Ends with the
+     chime, no rest after the final set. ---- */
   async function runCounting(session, player, cb, settings) {
     if (MT.resumeAudio) MT.resumeAudio();
     for (let s = 0; s < session.sets; s++) {
@@ -348,7 +355,8 @@
       if (s === 0) await drillCountdown(player, cb, settings);
       if (player.cancelled) return;
       cb.onPhase("go", "Counting");
-      // First count comes a fixed 1s after "Sijak" (drills use their tempo).
+      // First count comes a fixed 1s after the opening cue — "Sijak" on the
+      // first set, "Joonbi" after a rest (drills use their tempo).
       await wait(1, player);
       for (let n = 1; n <= session.target; n++) {
         if (stopped(player)) break;
@@ -358,7 +366,7 @@
         await wait(session.interval, player);
       }
       if (player.cancelled) return;
-      if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings);
+      if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings, "joonbi");
     }
     if (player.cancelled) return;
     cb.onPhase("done", "Complete");
