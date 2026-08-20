@@ -645,11 +645,12 @@
   };
 
   /* -------------------- Speed matches (U30 base) --------------------
-     Divisions other than U30 can reuse the U30 recording at an adjusted
-     speed instead of needing their own upload. A match maps a
+     Any division can reuse the U30 recording at an adjusted speed
+     instead of needing its own upload (U30 itself included — its match
+     just plays its own recording faster/slower). A match maps a
      (section, division, poomsae) to a playback speed on the U30 clip —
-     the U30 audio itself is never changed. Admin-set matches live in
-     localStorage (clip meta, field "speed"); published matches ship in
+     the audio files themselves are never changed. Admin-set matches live
+     in localStorage (clip meta, field "speed"); published matches ship in
      data/tempomap.json. A local match wins over the published one, and
      any match wins over that division's own uploaded/shipped clip. */
   const REPO_TEMPO = new Map(); // clipKey -> speed (e.g. 1.05 = 5% faster)
@@ -674,7 +675,6 @@
 
   // The speed match for (section, division, id), or 0 when there is none.
   MT.matchSpeed = function (section, division, id) {
-    if (section === "black" && division === "u30") return 0; // U30 IS the base
     const key = clipKey(section, division, id);
     const m = MT.getClipMeta ? MT.getClipMeta(key) : null;
     if (m && Number(m.speed) > 0) return Number(m.speed);

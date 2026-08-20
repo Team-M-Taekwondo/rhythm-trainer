@@ -859,15 +859,18 @@
     const base = MT.clipDuration("black", "u30", editorForm.id);
     const pct = Math.round((rate - 1) * 100);
     $("#speed-len").textContent =
-      (pct === 0 ? "Same speed as U30" : pct > 0 ? pct + "% faster than U30" : -pct + "% slower than U30") +
-      " — plays in " + (base / rate).toFixed(1) + "s (U30: " + base.toFixed(1) + "s).";
+      (pct === 0
+        ? "Same speed as the sample recording"
+        : pct > 0
+          ? pct + "% faster than the sample recording"
+          : -pct + "% slower than the sample recording") +
+      " — plays in " + (base / rate).toFixed(1) + "s (sample: " + base.toFixed(1) + "s).";
   }
   function updateSpeedUI() {
     stopSpeedPreview();
     const panel = $("#speed-panel");
-    const isBase = editorSection === "black" && editorDivision === "u30";
     const hasBase = editorForm && MT.hasClip("black", "u30", editorForm.id);
-    panel.hidden = isBase || !hasBase;
+    panel.hidden = !hasBase;
     if (panel.hidden) return;
     const key = speedKey();
     const local = Number((MT.getClipMeta(key) || {}).speed) || 0;
@@ -875,15 +878,18 @@
     $("#speed-range").value = local || repo || 1;
     $("#speed-clear").disabled = !local;
     const target = editorSection === "black" ? "Black · " + editorDivision : "Color Belt";
-    const ownNote = MT.hasClip(editorSection, editorDiv(), editorForm.id)
-      ? " (overrides this division's own clip)"
-      : "";
+    // For U30 the sample IS its own clip, so there's nothing being overridden.
+    const isBase = editorSection === "black" && editorDivision === "u30";
+    const ownNote =
+      !isBase && MT.hasClip(editorSection, editorDiv(), editorForm.id)
+        ? " (overrides this division's own clip)"
+        : "";
     $("#speed-status").textContent = local
       ? "✓ Match saved on this device (" + local.toFixed(2) + "×) — " + target +
-        " plays the U30 audio at this speed" + ownNote + "."
+        " plays the sample rhythm audio at this speed" + ownNote + "."
       : repo
         ? "Published match (" + repo.toFixed(2) + "×) — " + target +
-          " plays the U30 audio at this speed" + ownNote + "."
+          " plays the sample rhythm audio at this speed" + ownNote + "."
         : "No match yet for " + target + ".";
     setSpeedLabel();
   }

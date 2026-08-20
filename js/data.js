@@ -95,7 +95,7 @@
   //  13 Sipjin · 14 Jitae · 15 Chonkwon
   //  Only O30 performs Chonkwon (15); U30 stops at Jitae (14).
   MT.DIVISION_POOMSAE = {
-    youth: [4, 5, 6, 7, 8, 9, 10],
+    youth: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     cadet: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     junior: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     u30: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
