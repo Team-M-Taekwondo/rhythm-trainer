@@ -46,6 +46,14 @@
     { "section": "black", "division": "u30", "poomsae": 11, "speed": 1.04 },
     { "section": "black", "division": "u30", "poomsae": 12, "speed": 1.04 },
     { "section": "black", "division": "u30", "poomsae": 13, "speed": 1.04 },
-    { "section": "black", "division": "u30", "poomsae": 14, "speed": 1.04 }
+    { "section": "black", "division": "u30", "poomsae": 14, "speed": 1.04 },
+    { "section": "color", "division": "", "poomsae": 1, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 2, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 3, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 4, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 5, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 6, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 7, "speed": 1 },
+    { "section": "color", "division": "", "poomsae": 8, "speed": 1 }
   ]
 }
