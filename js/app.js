@@ -289,6 +289,21 @@
   /* -------------------- PRESET DRILLS (Team Presets) -------------------- */
   let presetLevel = "black";
   let presetDrill = null; // the preset opened on the config screen
+  let presetSound = "woodblock";
+
+  function renderPresetSoundChips() {
+    $("#preset-sound-chips").innerHTML = MT.SOUNDS.map(
+      (s) =>
+        `<button class="sound-chip ${s.id === presetSound ? "active" : ""}" data-sound="${s.id}">${s.label}</button>`
+    ).join("");
+  }
+  $("#preset-sound-chips").addEventListener("click", (e) => {
+    const chip = e.target.closest(".sound-chip");
+    if (!chip) return;
+    presetSound = chip.dataset.sound;
+    renderPresetSoundChips();
+    playSoundSample(presetSound);
+  });
 
   const levelDelta = () =>
     (MT.PRESET_LEVELS.find((l) => l.id === presetLevel) || {}).delta || 0;
@@ -347,6 +362,7 @@
     $("#preset-title").textContent = d.name;
     renderLevelSeg("#preset-cfg-level");
     fillTempoSelect($("#preset-tempo"), levelTempo(d.tempo), "", MT.DRILL_TEMPOS);
+    renderPresetSoundChips();
     $("#preset-reps").value = d.reps;
     $("#preset-sets").value = d.sets;
     $("#preset-rest").value = d.rest;
@@ -373,7 +389,7 @@
           name: presetDrill.name,
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: tempo,
-          sound: "woodblock",
+          sound: presetSound,
         }),
       ],
       sets: setsPerRound * rounds,
