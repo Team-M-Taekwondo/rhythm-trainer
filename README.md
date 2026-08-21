@@ -15,6 +15,7 @@ step, no dependencies. Just static files you can host for free on GitHub Pages.
 - **Tempo grid** — 0.5 s → 8 s in half-second steps.
 - **Selectable metronome sound per form/drill** — wood block, beep, drum, click, clave.
 - **Rhythm Editor** — calibrate each form: set every count's duration, mark accents/holds, "set all", tap-tempo, and preview. Saved in the browser.
+- **Count sections** — mark the stretches of a recording where the audio counts out loud in Korean (Taegeuk Pal Jang's two 8-count sections, say). A division's speed match speeds up everything else but leaves those at the recording's own speed, so the count never changes.
 - **Korean voice cues** via the device's built-in speech (swappable for recorded coach clips later).
 - **Installable PWA** — works offline once loaded; responsive from phone to laptop.
 

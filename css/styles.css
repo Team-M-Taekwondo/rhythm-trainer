@@ -271,6 +271,30 @@ select {
 .vp-buttons { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
 .file-btn { cursor: pointer; }
 
+/* -------- count sections (natural-speed zones) -------- */
+.zone-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.zone-num {
+  flex: none; width: 22px; height: 22px; border-radius: 999px;
+  background: rgba(231, 177, 10, 0.16); color: var(--gold);
+  font-size: 12px; font-weight: 800; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+/* Scope banner — spells out that these times are per poomsae, not per division. */
+.zones-scope {
+  margin: -4px 0 12px; padding: 9px 12px;
+  background: rgba(231, 177, 10, 0.1); border: 1px solid rgba(231, 177, 10, 0.35);
+  border-radius: var(--radius-sm);
+  color: var(--gold-soft); font-size: 12.5px; font-weight: 700; line-height: 1.4;
+}
+.zone-in { flex: 1; min-width: 0; padding: 9px 10px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.zone-sep { flex: none; color: var(--muted); font-size: 13px; }
+.zone-row .zone-del { flex: none; padding: 9px 12px; font-size: 13px; }
+#zone-time { color: var(--gold-soft); font-variant-numeric: tabular-nums; font-weight: 600; }
+
 /* -------- poomsae randomizer -------- */
 .rz-result { text-align: center; padding: 36px 18px; }
 .rz-num {

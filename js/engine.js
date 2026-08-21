@@ -215,11 +215,16 @@
         : { section: item.section, division: item.division, id: item.id, rate: 1 };
       if (!clip) return resolve();
       const rate = clip.rate || 1;
-      // Heard duration — the buffer plays `rate`× faster than real time.
-      const dur = MT.clipDuration(clip.section, clip.division, clip.id) / rate;
+      // Segment plan: the recording at the match speed, except the count
+      // sections baked into the audio, which stay at the sample's own speed.
+      const plan = MT.clipPlan
+        ? MT.clipPlan(clip.section, clip.division, clip.id, rate)
+        : { segments: [], duration: MT.clipDuration(clip.section, clip.division, clip.id) / rate };
+      // Heard duration — shorter than the recording wherever the match speeds it up.
+      const dur = plan.duration;
       if (!dur) return resolve();
-      let src = null;
-      let playStart = 0; // ctx time that maps to clip offset 0 (shifts on seek)
+      let handle = null;
+      let playStart = 0; // ctx time that maps to heard 0 (shifts on seek)
       let done = false;
       const finish = () => {
         if (done) return;
@@ -227,26 +232,23 @@
         player.seek = null;
         resolve();
       };
-      // (Re)start the clip from `offset` HEARD seconds. Web Audio can't seek a
-      // live source, so we stop the old one and start a fresh buffer at the
-      // offset (converted to buffer seconds via the rate).
+      // (Re)start from `offset` HEARD seconds. Web Audio can't seek a live
+      // source, so we drop the old sources and schedule the plan again from
+      // that point. Aborting the old handle keeps its end callback quiet.
       function startAt(offset) {
         offset = Math.max(0, Math.min(dur - 0.05, offset));
-        if (src) {
-          try { src.onended = null; src.stop(); } catch (e) {}
-        }
-        src = MT.playClipAt(clip.section, clip.division, clip.id, player.bus, offset * rate, rate);
-        player.clipSrc = src;
-        playStart = MT.now() - offset;
-        if (src) src.onended = finish; // fires at the buffer's natural end
+        if (handle) handle.stop();
+        handle = MT.playPlanAt(clip.section, clip.division, clip.id, player.bus, plan, offset, finish);
+        player.clipSrc = handle;
+        playStart = handle ? handle.startedAt : MT.now() - offset;
       }
       startAt(0);
-      if (!src) return resolve();
+      if (!handle) return resolve();
       player.seek = (frac) => startAt(Math.max(0, Math.min(1, frac)) * dur);
 
       (function tick() {
         if (stopped(player)) {
-          try { src.stop(); } catch (e) {}
+          if (handle) handle.stop();
           return finish();
         }
         const elapsed = Math.min(dur, Math.max(0, MT.now() - playStart));

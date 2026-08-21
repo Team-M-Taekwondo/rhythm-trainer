@@ -807,6 +807,7 @@
     $("#clip-delete").disabled = !has;
     stopClipPreview();
     updateSpeedUI();
+    loadZoneDraft();
   }
   $("#clip-file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
@@ -862,13 +863,23 @@
     if (!editorForm || !MT.hasClip("black", "u30", editorForm.id)) return;
     const base = MT.clipDuration("black", "u30", editorForm.id);
     const pct = Math.round((rate - 1) * 100);
+    // Length comes from the segment plan, so it accounts for any count
+    // sections held back at the sample's own speed — including unsaved edits,
+    // but only when the zone editor is pointed at the sample itself.
+    const plan = MT.clipPlan("black", "u30", editorForm.id, rate, onBaseRecording() ? zoneDraft : undefined);
+    const zones = onBaseRecording() ? MT.tidyZones(zoneDraft, base) : [];
     $("#speed-len").textContent =
       (pct === 0
         ? "Same speed as the sample recording"
         : pct > 0
           ? pct + "% faster than the sample recording"
           : -pct + "% slower than the sample recording") +
-      " — plays in " + (base / rate).toFixed(1) + "s (sample: " + base.toFixed(1) + "s).";
+      " — plays in " + plan.duration.toFixed(1) + "s (sample: " + base.toFixed(1) + "s)." +
+      (zones.length && pct !== 0
+        ? zones.length === 1
+          ? " 1 count section stays at the sample's speed."
+          : " " + zones.length + " count sections stay at the sample's speed."
+        : "");
   }
   function updateSpeedUI() {
     stopSpeedPreview();
@@ -897,16 +908,22 @@
         : "No match yet for " + target + ".";
     setSpeedLabel();
   }
+  // Live-adjust a running preview so he can dial it in by ear. A preview with
+  // count sections has its timeline already scheduled, so it stops instead —
+  // tap Preview again to hear the new speed.
+  function retuneSpeedPreview() {
+    if (!speedPreviewSrc) return;
+    if (!speedPreviewSrc.setRate(speedVal())) stopSpeedPreview();
+  }
   function nudgeSpeed(d) {
     const r = Math.max(0.7, Math.min(1.3, Math.round((speedVal() + d) * 100) / 100));
     $("#speed-range").value = r;
     setSpeedLabel();
-    // Live-adjust a running preview so he can dial it in by ear.
-    if (speedPreviewSrc) speedPreviewSrc.playbackRate.value = r;
+    retuneSpeedPreview();
   }
   $("#speed-range").addEventListener("input", () => {
     setSpeedLabel();
-    if (speedPreviewSrc) speedPreviewSrc.playbackRate.value = speedVal();
+    retuneSpeedPreview();
   });
   $("#speed-minus").addEventListener("click", () => nudgeSpeed(-0.01));
   $("#speed-plus").addEventListener("click", () => nudgeSpeed(0.01));
@@ -915,11 +932,16 @@
     if (!editorForm) return;
     MT.unlockAudio();
     stopClipPreview();
-    const src = MT.playClipAt("black", "u30", editorForm.id, null, 0, speedVal());
-    if (src) {
-      speedPreviewSrc = src;
+    stopZonePlay();
+    // Preview exactly what the division hears: the match speed everywhere
+    // except the count sections, which stay at the sample's speed.
+    const plan = MT.clipPlan(
+      "black", "u30", editorForm.id, speedVal(), onBaseRecording() ? zoneDraft : undefined
+    );
+    const h = MT.playPlanAt("black", "u30", editorForm.id, null, plan, 0, stopSpeedPreview);
+    if (h) {
+      speedPreviewSrc = h;
       $("#speed-preview").textContent = "Stop";
-      src.onended = stopSpeedPreview;
     }
   });
   $("#speed-save").addEventListener("click", () => {
@@ -932,6 +954,212 @@
     if (!editorForm) return;
     MT.setClipMeta(speedKey(), { speed: null });
     updateSpeedUI();
+  });
+
+  /* ---- Count sections: the ranges of a RECORDING where the audio counts in
+     Korean. A speed match leaves those at the recording's own speed so the
+     count never changes. The times are positions in the audio file, so every
+     division on the same file shares one set — the division's speed decides
+     when each range is heard. A division playing its own upload is a different
+     file and gets its own set. ---- */
+  let zoneDraft = []; // [[a, b], …] being edited, in recording seconds
+  let zonePlaySrc = null; // playback used for marking
+  let zonePlayStart = 0; // ctx time that maps to 0s in the recording
+  let zonePlayRaf = 0;
+  let zoneMarkStart = null; // pending "Mark start", waiting on "Mark end"
+
+  // The recording the zone editor is pointed at: whatever the selected
+  // division actually plays, falling back to the sample when nothing resolves.
+  function zoneClip() {
+    if (!editorForm) return null;
+    const r = MT.resolveClip(editorSection, editorDiv(), editorForm.id);
+    if (r) return r;
+    return MT.hasClip("black", "u30", editorForm.id)
+      ? { section: "black", division: "u30", id: editorForm.id, rate: 1 }
+      : null;
+  }
+  const onBaseRecording = () => {
+    const zc = zoneClip();
+    return !!zc && zc.section === "black" && zc.division === "u30";
+  };
+  const zoneDur = () => {
+    const zc = zoneClip();
+    return zc ? MT.clipDuration(zc.section, zc.division, zc.id) : 0;
+  };
+  // Where the marking playback is right now, or null when it isn't running.
+  const zoneHead = () =>
+    zonePlaySrc ? Math.min(zoneDur(), Math.max(0, MT.now() - zonePlayStart)) : null;
+
+  function stopZonePlay() {
+    if (zonePlaySrc) {
+      try {
+        zonePlaySrc.stop();
+      } catch (e) {}
+    }
+    zonePlaySrc = null;
+    if (zonePlayRaf) cancelAnimationFrame(zonePlayRaf);
+    zonePlayRaf = 0;
+    const btn = $("#zone-play");
+    if (btn) btn.textContent = "Play recording";
+  }
+  function loadZoneDraft() {
+    stopZonePlay();
+    zoneMarkStart = null;
+    const zc = zoneClip();
+    zoneDraft = zc ? MT.getZones(zc.section, zc.division, zc.id).map((z) => z.slice()) : [];
+    renderZonesUI();
+  }
+  // Everyone who actually hears these sections: the divisions that land on
+  // this same recording at a speed other than 1× (at 1× nothing is held back).
+  function zoneAudience() {
+    const zc = zoneClip();
+    if (!zc) return [];
+    const target = MT.clipKey(zc.section, zc.division, zc.id);
+    const candidates = [{ s: "color", d: "", label: "Color Belt" }].concat(
+      MT.CLIP_DIVISIONS.map((d) => ({
+        s: "black",
+        d: d,
+        label: (MT.DIVISIONS.find((x) => x.id === d) || {}).label || d,
+      }))
+    );
+    return candidates
+      .filter((c) => {
+        const r = MT.resolveClip(c.s, c.d, editorForm.id);
+        return (
+          r && MT.clipKey(r.section, r.division, r.id) === target && (r.rate || 1) !== 1
+        );
+      })
+      .map((c) => c.label);
+  }
+  // Plain-English name for the file being edited.
+  function zoneRecordingName() {
+    const zc = zoneClip();
+    if (!zc) return "";
+    if (zc.section === "black" && zc.division === "u30") return "the sample recording";
+    const label =
+      zc.section === "color"
+        ? "Color Belt"
+        : (MT.DIVISIONS.find((x) => x.id === zc.division) || {}).label || zc.division;
+    return label + "'s own recording";
+  }
+  function zonesStatus() {
+    const zc = zoneClip();
+    if (!zc) return "";
+    const local = MT.localZones(zc.section, zc.division, zc.id);
+    const repo = MT.repoZones(zc.section, zc.division, zc.id);
+    if (local) {
+      return local.length
+        ? "✓ " + local.length + " section(s) saved on this device."
+        : "✓ Saved on this device: no count sections (overrides the published set).";
+    }
+    return repo.length
+      ? "Published: " + repo.length + " section(s) — shared with the whole team."
+      : "No count sections set — this recording follows each division's match speed throughout.";
+  }
+  function renderZonesUI() {
+    const panel = $("#zones-panel");
+    const zc = zoneClip();
+    panel.hidden = !zc;
+    if (panel.hidden) return;
+    const dur = zoneDur();
+    const heard = zoneAudience();
+    $("#zones-scope").textContent =
+      editorForm.name + " · " + zoneRecordingName() + " · applies to " +
+      (heard.length ? heard.join(", ") : "no division yet — set a speed match first");
+    $("#zones-status").textContent = zonesStatus();
+    $("#zones-list").innerHTML = zoneDraft.length
+      ? zoneDraft
+          .map(
+            (z, i) => `
+        <div class="zone-row">
+          <span class="zone-num">${i + 1}</span>
+          <input class="zone-in" type="number" inputmode="decimal" step="0.1" min="0" max="${dur.toFixed(1)}"
+                 data-zi="${i}" data-edge="0" value="${z[0].toFixed(1)}" aria-label="Section ${i + 1} start" />
+          <span class="zone-sep">&rarr;</span>
+          <input class="zone-in" type="number" inputmode="decimal" step="0.1" min="0" max="${dur.toFixed(1)}"
+                 data-zi="${i}" data-edge="1" value="${z[1].toFixed(1)}" aria-label="Section ${i + 1} end" />
+          <span class="zone-sep">s</span>
+          <button class="btn ghost zone-del" data-zi="${i}">Remove</button>
+        </div>`
+          )
+          .join("")
+      : `<p class="hint">No count sections yet.</p>`;
+    $("#zones-clear").disabled = !MT.localZones(zc.section, zc.division, zc.id);
+    setSpeedLabel(); // the heard length depends on these
+  }
+  $("#zone-play").addEventListener("click", () => {
+    if (zonePlaySrc) return stopZonePlay();
+    const zc = zoneClip();
+    if (!zc) return;
+    MT.unlockAudio();
+    stopClipPreview();
+    stopSpeedPreview();
+    // Always at 1× — the times being marked are positions in the file itself.
+    const src = MT.playClipAt(zc.section, zc.division, zc.id, null, 0, 1);
+    if (!src) return;
+    zonePlaySrc = src;
+    zonePlayStart = MT.now();
+    $("#zone-play").textContent = "Stop";
+    src.onended = stopZonePlay;
+    (function tick() {
+      if (!zonePlaySrc) return;
+      $("#zone-time").textContent =
+        zoneHead().toFixed(1) + "s / " + zoneDur().toFixed(1) + "s";
+      zonePlayRaf = requestAnimationFrame(tick);
+    })();
+  });
+  $("#zone-mark-start").addEventListener("click", () => {
+    const h = zoneHead();
+    if (h == null) {
+      $("#zones-status").textContent = "Tap “Play recording” first, then mark.";
+      return;
+    }
+    zoneMarkStart = h;
+    $("#zones-status").textContent =
+      "Start marked at " + h.toFixed(1) + "s — tap “Mark end” when the counting stops.";
+  });
+  $("#zone-mark-end").addEventListener("click", () => {
+    const h = zoneHead();
+    if (h == null || zoneMarkStart == null) {
+      $("#zones-status").textContent = "Mark a start first.";
+      return;
+    }
+    zoneDraft.push([Math.min(zoneMarkStart, h), Math.max(zoneMarkStart, h)]);
+    zoneMarkStart = null;
+    renderZonesUI();
+  });
+  $("#zone-add").addEventListener("click", () => {
+    const at = zoneHead() != null ? zoneHead() : 0;
+    zoneDraft.push([at, Math.min(zoneDur(), at + 8)]);
+    renderZonesUI();
+  });
+  // Typed edits mutate the draft in place — no re-render, so the field keeps focus.
+  $("#zones-list").addEventListener("input", (e) => {
+    const inp = e.target.closest(".zone-in");
+    if (!inp) return;
+    const z = zoneDraft[Number(inp.dataset.zi)];
+    if (!z) return;
+    z[Number(inp.dataset.edge)] = Math.max(0, Math.min(zoneDur(), Number(inp.value) || 0));
+    setSpeedLabel();
+  });
+  $("#zones-list").addEventListener("click", (e) => {
+    const del = e.target.closest(".zone-del");
+    if (!del) return;
+    zoneDraft.splice(Number(del.dataset.zi), 1);
+    renderZonesUI();
+  });
+  $("#zones-save").addEventListener("click", () => {
+    const zc = zoneClip();
+    if (!zc) return;
+    MT.setZones(zc.section, zc.division, zc.id, zoneDraft);
+    loadZoneDraft(); // re-read the tidied, saved version
+    flash("#zones-save", "Saved ✓");
+  });
+  $("#zones-clear").addEventListener("click", () => {
+    const zc = zoneClip();
+    if (!zc) return;
+    MT.setZones(zc.section, zc.division, zc.id, null); // back to the published set
+    loadZoneDraft();
   });
 
   function playSoundSample(soundId) {
@@ -1090,24 +1318,57 @@
           a.division.localeCompare(b.division) ||
           a.poomsae - b.poomsae
       );
+    // Count sections, keyed by recording — same merge rule: the published set
+    // unless this device has its own saved ranges for that recording.
+    const zoneMap = new Map(MT.getRepoZones ? MT.getRepoZones() : []);
+    Object.keys(metaAll).forEach((k) => {
+      if (Array.isArray(metaAll[k] && metaAll[k].zones)) zoneMap.set(k, metaAll[k].zones);
+    });
+    const zones = Array.from(zoneMap.entries())
+      .map(([k, ranges]) => {
+        const [section, division, idStr] = k.split("|");
+        return {
+          section,
+          division,
+          poomsae: Number(idStr),
+          ranges: MT.tidyZones(ranges, 0).map((z) => [
+            Math.round(z[0] * 100) / 100,
+            Math.round(z[1] * 100) / 100,
+          ]),
+        };
+      })
+      .filter((z) => z.poomsae > 0 && z.ranges.length)
+      .sort(
+        (a, b) =>
+          a.section.localeCompare(b.section) ||
+          a.division.localeCompare(b.division) ||
+          a.poomsae - b.poomsae
+      );
     files.push({
       name: "data/tempomap.json",
-      data: new TextEncoder().encode(JSON.stringify({ matches }, null, 2) + "\n"),
+      data: new TextEncoder().encode(JSON.stringify({ matches, zones }, null, 2) + "\n"),
     });
-    return { blob: makeZip(files), count: clips.length, matchCount: matches.length, manifest };
+    return {
+      blob: makeZip(files),
+      count: clips.length,
+      matchCount: matches.length,
+      zoneCount: zones.length,
+      manifest,
+    };
   }
   async function exportForGitHub() {
     $("#export-status").textContent = "Packaging…";
     try {
-      const { blob, count, matchCount } = await buildExportZip();
-      if (!count && !matchCount) {
-        $("#export-status").textContent = "Nothing to export yet — no clips or speed matches.";
+      const { blob, count, matchCount, zoneCount } = await buildExportZip();
+      if (!count && !matchCount && !zoneCount) {
+        $("#export-status").textContent = "Nothing to export yet — no clips, speed matches or count sections.";
         return;
       }
       downloadBlob(blob, "mteam-rhythm-data.zip");
       $("#export-status").textContent =
-        "Exported " + count + " clip(s) + " + matchCount +
-        " speed match(es) → mteam-rhythm-data.zip. Unzip into the project folder, then push.";
+        "Exported " + count + " clip(s) + " + matchCount + " speed match(es) + " +
+        zoneCount + " poomsae with count sections → mteam-rhythm-data.zip. " +
+        "Unzip into the project folder, then push.";
     } catch (e) {
       $("#export-status").textContent = "Export failed: " + e.message;
     }

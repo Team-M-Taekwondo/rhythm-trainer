@@ -10,11 +10,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=79" />
+  <link rel="stylesheet" href="css/styles.css?v=82" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=79" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=79" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=82" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=82" />
 </head>
 <body>
   <div id="app">
@@ -383,7 +383,7 @@
 
       <div class="panel" id="speed-panel" hidden>
         <h2>Speed match</h2>
-        <p class="hint">No upload needed — this division plays a <b>sample poomsae rhythm recording</b> at the speed below. The original recording is never changed. Set a speed, preview it, then save the match.</p>
+        <p class="hint">No upload needed — this division plays a <b>sample poomsae rhythm recording</b> at the speed below. The original recording is never changed. Set a speed, preview it, then save the match. <b>The speed is per division</b> (the count sections below are not).</p>
         <p class="hint" id="speed-status"></p>
         <label class="field">
           <span>Speed <b id="speed-val">1.00&times;</b></span>
@@ -398,6 +398,27 @@
         <div class="vp-buttons">
           <button class="btn" id="speed-save">Save match</button>
           <button class="btn ghost" id="speed-clear" disabled>Clear match</button>
+        </div>
+      </div>
+
+      <div class="panel" id="zones-panel" hidden>
+        <h2>Count sections</h2>
+        <p class="zones-scope" id="zones-scope"></p>
+        <p class="hint"><b>These times are positions in the audio file, not stopwatch times during the run.</b> Every division on a speed match plays the same file, so they share one set &mdash; then each division's speed decides when the counting is actually <i>heard</i> (20.4s into the file lands at 17.7s for Cadet at 1.15&times;, 20.0s for Youth at 1.02&times;). Editing here changes it for every division on this recording.</p>
+        <p class="hint">Mark the stretches where the audio <b>counts out loud in Korean</b> (Taegeuk Pal Jang's two 8-count sections, for example). Those play at the recording's own speed, so the count itself never changes length however fast the match is.</p>
+        <p class="hint" id="zones-status"></p>
+        <div id="zones-list" class="checklist"></div>
+        <p class="hint">Play the recording, then tap <b>Mark start</b> when the counting begins and <b>Mark end</b> when it stops. Fine-tune the numbers after. Playback here is always 1&times; &mdash; you're marking the file, not a division.</p>
+        <div class="vp-buttons">
+          <button class="btn ghost" id="zone-play">Play recording</button>
+          <button class="btn ghost" id="zone-mark-start">Mark start</button>
+          <button class="btn ghost" id="zone-mark-end">Mark end</button>
+        </div>
+        <p class="hint" id="zone-time">0.0s</p>
+        <div class="vp-buttons">
+          <button class="btn ghost" id="zone-add">Add manually</button>
+          <button class="btn" id="zones-save">Save sections</button>
+          <button class="btn ghost" id="zones-clear" disabled>Clear</button>
         </div>
       </div>
 
@@ -448,9 +469,9 @@
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=79"></script>
-  <script src="js/audio.js?v=79"></script>
-  <script src="js/engine.js?v=79"></script>
-  <script src="js/app.js?v=79"></script>
+  <script src="js/data.js?v=82"></script>
+  <script src="js/audio.js?v=82"></script>
+  <script src="js/engine.js?v=82"></script>
+  <script src="js/app.js?v=82"></script>
 </body>
 </html>

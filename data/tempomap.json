@@ -55,5 +55,6 @@
     { "section": "color", "division": "", "poomsae": 6, "speed": 1 },
     { "section": "color", "division": "", "poomsae": 7, "speed": 1 },
     { "section": "color", "division": "", "poomsae": 8, "speed": 1 }
-  ]
+  ],
+  "zones": []
 }

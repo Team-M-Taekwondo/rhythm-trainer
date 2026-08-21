@@ -664,6 +664,16 @@
         const s = Number(c.speed);
         if (s > 0) REPO_TEMPO.set(clipKey(c.section, c.division || "", c.poomsae), s);
       });
+      // Count sections belong to a RECORDING, so they're keyed by clip. An
+      // entry with no section is from the first build, when they were always
+      // the U30 sample.
+      ((m && m.zones) || []).forEach((z) => {
+        const id = Number(z.poomsae);
+        if (!(id > 0) || !Array.isArray(z.ranges)) return;
+        const section = z.section || "black";
+        const division = z.section ? z.division || "" : "u30";
+        REPO_ZONES.set(clipKey(section, division, id), z.ranges);
+      });
     } catch (e) {}
   };
   MT.repoTempoSpeed = function (key) {
@@ -692,6 +702,181 @@
       return { section, division, id, rate: 1 };
     }
     return null;
+  };
+
+  /* -------------------- Count sections (natural-speed zones) --------------
+     Stretches of the sample recording where the audio counts out loud in
+     Korean — Taegeuk Pal Jang's two 8-count sections, for example. Those
+     counts are fixed: the athlete goes through 8 counts no matter how fast
+     the form is running. So a speed match speeds up everything EXCEPT these
+     ranges, which stay at the recording's own speed.
+
+     Ranges are positions in the RECORDING's own timeline, and they belong to
+     that recording — not to a division. Every division on a speed match plays
+     the same sample file, so they share one set; the division's speed then
+     decides when each range is *heard* (buffer 20.4s lands at 17.7s heard at
+     1.15×, 20.0s at 1.02×). A division playing its own uploaded recording is a
+     different file and gets its own set.
+
+     Admin edits live in clip meta ("zones"); published ones ship in
+     data/tempomap.json. A local edit wins over the published set. */
+  const REPO_ZONES = new Map(); // clipKey -> [[a, b], ...]
+
+  // Clean a raw range list: numbers only, inside the recording, sorted, merged.
+  function tidyZones(list, dur) {
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach((z) => {
+      const a = Number(Array.isArray(z) ? z[0] : z && z.a);
+      const b = Number(Array.isArray(z) ? z[1] : z && z.b);
+      if (!isFinite(a) || !isFinite(b)) return;
+      const lo = Math.max(0, Math.min(a, b));
+      const hi = dur ? Math.min(dur, Math.max(a, b)) : Math.max(a, b);
+      if (hi - lo > 0.05) out.push([lo, hi]);
+    });
+    out.sort((x, y) => x[0] - y[0]);
+    const merged = [];
+    out.forEach((z) => {
+      const last = merged[merged.length - 1];
+      if (last && z[0] <= last[1]) last[1] = Math.max(last[1], z[1]);
+      else merged.push(z.slice());
+    });
+    return merged;
+  }
+  MT.tidyZones = tidyZones;
+
+  // Published zones for a recording (from data/tempomap.json).
+  MT.repoZones = function (section, division, id) {
+    return tidyZones(
+      REPO_ZONES.get(clipKey(section, division, id)) || [],
+      MT.clipDuration(section, division, id)
+    );
+  };
+  // This device's saved zones, or null when it has never set any for this
+  // recording. An empty array is a deliberate "no count sections" that
+  // overrides the published set.
+  MT.localZones = function (section, division, id) {
+    const key = clipKey(section, division, id);
+    const meta = (MT.getClipMeta ? MT.getClipMeta(key) : null) || {};
+    return Array.isArray(meta.zones)
+      ? tidyZones(meta.zones, MT.clipDuration(section, division, id))
+      : null;
+  };
+  MT.getZones = function (section, division, id) {
+    const local = MT.localZones(section, division, id);
+    return local || MT.repoZones(section, division, id);
+  };
+  MT.setZones = function (section, division, id, list) {
+    if (!MT.setClipMeta) return;
+    MT.setClipMeta(clipKey(section, division, id), {
+      zones: list ? tidyZones(list, MT.clipDuration(section, division, id)) : null,
+    });
+  };
+  MT.getRepoZones = function () {
+    return Array.from(REPO_ZONES.entries());
+  };
+
+  /* A playback plan: the recording sliced into segments, each with its own
+     rate. Everything runs at the match speed except the count sections, which
+     run at 1×. Times: b0/b1 are BUFFER seconds, h0/h1 are HEARD seconds.
+     No zones (or a 1× match) collapses to a single plain segment, i.e. exactly
+     what the app did before. `zonesOverride` lets the editor plan against
+     ranges it hasn't saved yet. */
+  MT.clipPlan = function (section, division, id, rate, zonesOverride) {
+    const dur = MT.clipDuration(section, division, id);
+    if (!dur) return { segments: [], duration: 0, zoned: false };
+    rate = rate > 0 ? rate : 1;
+    // Zones belong to whichever recording is actually playing. At 1× there's
+    // nothing to hold back, so they're irrelevant.
+    const own = Array.isArray(zonesOverride)
+      ? tidyZones(zonesOverride, dur)
+      : MT.getZones(section, division, id);
+    const zones = rate !== 1 ? own : [];
+    const segments = [];
+    let heard = 0;
+    const push = (b0, b1, r) => {
+      if (b1 - b0 < 1e-3) return;
+      const h = (b1 - b0) / r;
+      segments.push({ b0, b1, rate: r, h0: heard, h1: heard + h });
+      heard += h;
+    };
+    let cursor = 0;
+    zones.forEach((z) => {
+      const a = Math.max(cursor, Math.min(z[0], dur));
+      const b = Math.min(z[1], dur);
+      if (b <= cursor) return;
+      push(cursor, a, rate); // sped-up stretch leading into the counting
+      push(a, b, 1); // the counting itself — sample speed
+      cursor = b;
+    });
+    push(cursor, dur, rate);
+    return { segments, duration: heard, zoned: segments.length > 1 };
+  };
+
+  // Play a plan from `fromHeard` heard-seconds in. Returns a handle
+  // { stop(), setRate(), duration, startedAt } or null. Segments are
+  // butt-joined with an ~8ms fade so the speed changes don't click.
+  MT.playPlanAt = function (section, division, id, bus, plan, fromHeard, onEnd) {
+    ensureContext();
+    keepAlive();
+    const buf = CLIP_CACHE.get(clipKey(section, division, id));
+    if (!buf || !plan || !plan.segments.length) return null;
+    const out = bus || master;
+    const from = Math.max(0, Math.min(Math.max(0, plan.duration - 0.02), fromHeard || 0));
+    const t0 = ctx.currentTime + 0.08; // small lead-in so nothing starts late
+    const sources = [];
+    const handle = {
+      aborted: false,
+      duration: plan.duration,
+      startedAt: t0 - from, // ctx time that maps to heard 0
+      stop: function () {
+        this.aborted = true;
+        sources.forEach((s) => {
+          try {
+            s.stop();
+          } catch (e) {}
+        });
+      },
+      // Live rate change is only safe on a single-segment plan — a zoned
+      // plan's timeline is baked into the schedule. Returns false if it can't.
+      setRate: function (r) {
+        if (sources.length !== 1 || !(r > 0)) return false;
+        try {
+          sources[0].playbackRate.value = r;
+          return true;
+        } catch (e) {
+          return false;
+        }
+      },
+    };
+    plan.segments.forEach((seg) => {
+      if (seg.h1 <= from + 1e-4) return;
+      const skip = Math.max(0, from - seg.h0); // heard seconds already gone
+      const b0 = seg.b0 + skip * seg.rate;
+      const bufLen = seg.b1 - b0;
+      if (bufLen < 1e-3) return;
+      const heardLen = bufLen / seg.rate;
+      const at = t0 + (seg.h0 + skip - from);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      if (seg.rate !== 1) src.playbackRate.value = seg.rate;
+      const g = ctx.createGain();
+      const f = Math.min(0.008, heardLen / 3);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(1, at + f);
+      g.gain.setValueAtTime(1, at + heardLen - f);
+      g.gain.linearRampToValueAtTime(0.0001, at + heardLen);
+      src.connect(g).connect(out);
+      // stop() is in context time, so the cut is exact whatever the rate —
+      // safer than relying on start()'s buffer-relative duration argument.
+      src.start(at, b0);
+      src.stop(at + heardLen + 0.01);
+      sources.push(src);
+    });
+    if (!sources.length) return null;
+    sources[sources.length - 1].onended = function () {
+      if (!handle.aborted && onEnd) onEnd();
+    };
+    return handle;
   };
 
   // Preview an unsaved uploaded file (Blob); returns { source, duration }.
