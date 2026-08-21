@@ -56,9 +56,9 @@
      end: "announce" = final rest + spoken completion (like the custom drill);
           "chime"    = no rest after the last set, just the finish chime. */
   MT.PRESET_LEVELS = [
-    { id: "color", label: "Color Belts", delta: 0.1 },
-    { id: "black", label: "Black Belts", delta: 0 },
     { id: "comp", label: "Comp. Black", delta: -0.1 },
+    { id: "black", label: "Black Belts", delta: 0 },
+    { id: "color", label: "Color Belts", delta: 0.1 },
   ];
   MT.PRESET_DRILLS = [
     { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, end: "announce" },
@@ -75,9 +75,9 @@
      Comp. Black as listed, Black Belt +0.5s, Color Belt +1.0s.
      New counting presets should always be entered at the comp reference. */
   MT.COUNT_LEVELS = [
-    { id: "color", label: "Color Belts", delta: 1.0 },
-    { id: "black", label: "Black Belts", delta: 0.5 },
     { id: "comp", label: "Comp. Black", delta: 0 },
+    { id: "black", label: "Black Belts", delta: 0.5 },
+    { id: "color", label: "Color Belts", delta: 1.0 },
   ];
   // Counting drill: seconds between counts at the comp reference.
   // Presets match the common kicks.
