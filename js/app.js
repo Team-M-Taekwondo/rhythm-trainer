@@ -386,21 +386,48 @@
   });
 
   /* -------------------- KOREAN COUNTING builder -------------------- */
+  let countLevel = "comp";
   let countInterval = 2.0;
+  const countDelta = () =>
+    (MT.COUNT_LEVELS.find((l) => l.id === countLevel) || {}).delta || 0;
+  // Level moves the interval only; snap to the 0.1s grid the select uses.
+  const countTempo = (base) => Math.max(0.1, Math.round((base + countDelta()) * 10) / 10);
   function renderCountBuilder() {
+    renderCountLevelSeg();
     renderCountChips();
     fillTempoSelect($("#count-custom"), countInterval, "", MT.DRILL_TEMPOS);
+  }
+  function renderCountLevelSeg() {
+    $("#count-level").innerHTML = MT.COUNT_LEVELS.map(
+      (l) =>
+        `<button class="seg-btn ${l.id === countLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
+    ).join("");
   }
   function renderCountChips() {
     $("#count-intervals").innerHTML = MT.COUNT_INTERVALS.map(
       (i) =>
-        `<button class="sound-chip ${Math.abs(i.v - countInterval) < 0.001 ? "active" : ""}" data-int="${i.v}">${i.v.toFixed(1)}s · ${i.label}</button>`
+        `<button class="sound-chip ${Math.abs(countTempo(i.v) - countInterval) < 0.001 ? "active" : ""}" data-int="${i.v}">${countTempo(i.v).toFixed(1)}s · ${i.label}</button>`
     ).join("");
   }
+  $("#count-level").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-level]");
+    if (!b) return;
+    // If a preset chip is active, keep it selected at the new level's tempo.
+    const preset = MT.COUNT_INTERVALS.find(
+      (i) => Math.abs(countTempo(i.v) - countInterval) < 0.001
+    );
+    countLevel = b.dataset.level;
+    if (preset) {
+      countInterval = countTempo(preset.v);
+      $("#count-custom").value = countInterval;
+    }
+    renderCountLevelSeg();
+    renderCountChips();
+  });
   $("#count-intervals").addEventListener("click", (e) => {
     const chip = e.target.closest("[data-int]");
     if (!chip) return;
-    countInterval = Number(chip.dataset.int);
+    countInterval = countTempo(Number(chip.dataset.int));
     renderCountChips();
     $("#count-custom").value = countInterval;
   });

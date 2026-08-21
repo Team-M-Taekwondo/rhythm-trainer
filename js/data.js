@@ -70,7 +70,17 @@
     { id: "udattack", group: "Standing drills", name: "All Stances · Up/Down · Attacks",            tempo: 1.4, reps: 20, rest: 10, sets: 4, end: "chime" },
   ];
 
-  // Counting drill: seconds between counts. Presets match the common kicks.
+  /* Counting-drill levels. Interval presets are stored at the COMPETITION
+     BLACK BELT reference tempo; the other levels add a fixed amount:
+     Comp. Black as listed, Black Belt +0.5s, Color Belt +1.0s.
+     New counting presets should always be entered at the comp reference. */
+  MT.COUNT_LEVELS = [
+    { id: "color", label: "Color Belts", delta: 1.0 },
+    { id: "black", label: "Black Belts", delta: 0.5 },
+    { id: "comp", label: "Comp. Black", delta: 0 },
+  ];
+  // Counting drill: seconds between counts at the comp reference.
+  // Presets match the common kicks.
   MT.COUNT_INTERVALS = [
     { v: 2.0, label: "Front kick" },
     { v: 2.3, label: "Round house" },

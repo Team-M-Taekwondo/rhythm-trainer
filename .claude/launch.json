@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "mteam-tempo",
+      "name": "static",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8412"],
-      "port": 8412
+      "runtimeArgs": ["-m", "http.server", "8199"],
+      "port": 8199
     }
   ]
 }
