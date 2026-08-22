@@ -10,11 +10,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=89" />
+  <link rel="stylesheet" href="css/styles.css?v=91" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=89" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=89" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=91" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=91" />
 </head>
 <body>
   <div id="app">
@@ -42,6 +42,11 @@
           <span class="card-kicker">Randomize</span>
           <span class="card-title">Poomsae Randomizer</span>
           <span class="card-sub">Pick a random poomsae for a belt rank or division</span>
+        </button>
+        <button class="card big" data-goto="camp">
+          <span class="card-kicker">Event</span>
+          <span class="card-title">Team USA Poomsae Camp Fundraiser</span>
+          <span class="card-sub">The run of show &mdash; every app block preset, one tap to run</span>
         </button>
         <button class="card" data-goto="editor">
           <span class="card-title">Rhythm Editor</span>
@@ -392,6 +397,19 @@
       <button class="start-btn" id="rz-go">&#127922; Randomize</button>
     </section>
 
+    <!-- ================= TEAM USA CAMP FUNDRAISER ================= -->
+    <section class="screen" data-screen="camp">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Team USA Camp</h1>
+      </div>
+      <div class="panel">
+        <h2>Level</h2>
+        <div class="seg" id="camp-level"></div>
+      </div>
+      <div id="camp-list"></div>
+    </section>
+
     <!-- ================= RUN ================= -->
     <section class="screen run" data-screen="run">
       <div class="run-top">
@@ -569,9 +587,9 @@
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=89"></script>
-  <script src="js/audio.js?v=89"></script>
-  <script src="js/engine.js?v=89"></script>
-  <script src="js/app.js?v=89"></script>
+  <script src="js/data.js?v=91"></script>
+  <script src="js/audio.js?v=91"></script>
+  <script src="js/engine.js?v=91"></script>
+  <script src="js/app.js?v=91"></script>
 </body>
 </html>

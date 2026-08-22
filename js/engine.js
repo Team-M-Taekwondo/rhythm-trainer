@@ -83,14 +83,17 @@
           acc += Math.max(0, (c.duration || N) - N);
         } else {
           events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent, mark: c.mark, cd: c.cd });
-          // Kick hold: woodblock ticks count each held second after the kick,
-          // the last one accented as the release cue. Part of the rep's time —
-          // the next rep's tempo interval starts after the hold lets go.
+          // Kick hold — AFTER the rep is done (rep > hold): the beat cues the
+          // kick, the rep's full tempo elapses while it extends, then the
+          // woodblock counts each held second, starting the moment the rep
+          // completes. The last tick is accented as the release cue, and the
+          // next rep's beat lands right after the hold lets go.
           const hold = c.hold > 0 ? Math.round(Math.min(10, c.hold)) : 0;
+          const rep = Math.max(0.1, c.duration);
           for (let k = 1; k <= hold; k++) {
-            events.push({ rt: acc + k, kind: "hold", n: c.n, k: k, N: hold });
+            events.push({ rt: acc + rep + (k - 1), kind: "hold", n: c.n, k: k, N: hold });
           }
-          acc += hold + Math.max(0.1, c.duration);
+          acc += rep + hold;
         }
       });
       const total = acc; // full metronome duration in seconds
