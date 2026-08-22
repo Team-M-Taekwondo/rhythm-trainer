@@ -97,6 +97,87 @@
     { v: 2.5, label: "Side kick" },
   ];
 
+  /* -------------------- Team USA Camp Fundraiser --------------------
+     The run of show for the Team USA Poomsae Camp Fundraiser, mirroring
+     the printed schedule. Blocks with `runs` are the app blocks — each
+     run is fully preset so the coach starts it with a single tap.
+       drill — base tempo comes from its PRESET_DRILLS id; the level seg
+               shifts it ±0.1s, same as Team Presets
+       count — interval stored at the comp reference; levels add +0.5/+1.0
+       goto  — jumps to another screen (nothing to preset)
+     rounds > 1 means one round per technique the coach calls out. */
+  MT.CAMP_BLOCKS = [
+    { time: "1:00", title: "Opening", lead: "Coach Huy",
+      note: "Welcome + intros · 3 Team USA performances · rundown of the afternoon" },
+    { time: "1:15", title: "Warm Up", lead: "Coach Long",
+      note: "Korea university team style — full body, everyone loose and warm" },
+    { time: "1:35", title: "Water Break" },
+    { time: "1:40", title: "Taegeuk 1 & 2", lead: "Coach Huy",
+      note: "Loosening up, not correcting technique yet" },
+    {
+      time: "1:45", title: "Basic Rhythm & Tempo — Hands", lead: "Coach Long",
+      note: "Explain the block at a high level first, then let the app run it.",
+      runs: [
+        { type: "drill", preset: "inplace", name: "In Place · All Stances",
+          reps: 10, setsPerRound: 2, rounds: 4, rest: 10,
+          detail: "2 sets each, one technique per round — front stance low block · front stance high block · back stance single knife hand · back stance double knife hand" },
+        { type: "drill", preset: "horse", name: "Horse Stance · Side to Side",
+          reps: 10, setsPerRound: 4, rounds: 1, rest: 10,
+          detail: "Punch · low block · high block · inward block" },
+      ],
+    },
+    { time: "2:00", title: "Water Break" },
+    {
+      time: "2:05", title: "Basic Kicking with Tempo", lead: "Coach Huy",
+      note: "5-second hold on the last kick of each set. Repeat the full cycle if the clock allows.",
+      runs: [
+        { type: "drill", preset: "front", name: "Front Kicks", reps: 10, setsPerRound: 4, rounds: 1, rest: 10, hold: 5 },
+        { type: "drill", preset: "round", name: "Round House Kicks", reps: 10, setsPerRound: 4, rounds: 1, rest: 10, hold: 5 },
+        { type: "drill", preset: "side", name: "Side Kicks", reps: 10, setsPerRound: 4, rounds: 1, rest: 10, hold: 5 },
+      ],
+    },
+    {
+      time: "2:30", title: "Intermediate Rhythm & Tempo — Hands", lead: "Coach Long",
+      note: "All stances, in place + up/down — back stance outward block / single / double knife hand · front stance punch or palm strike · front stance low block or Sipjin double punch · walking stance inward block or Tiger stance T7 palm strike.",
+      runs: [
+        { type: "drill", preset: "inplace", name: "In Place · All Stances", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udblock", name: "Up / Down · Blocks", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udattack", name: "Up / Down · Attacks", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+      ],
+    },
+    { time: "2:50", title: "Water Break" },
+    {
+      time: "2:55", title: "Poomsae Kicks", lead: "Coach Bo Hyeon Kim",
+      note: "3 minutes of instruction per kick — all three covered by 3:20.",
+      runs: [
+        { type: "count", name: "Front Kick", interval: 2.0, target: 10, sets: 4, rest: 10 },
+        { type: "count", name: "Round House", interval: 2.3, target: 10, sets: 4, rest: 10 },
+        { type: "count", name: "Side Kick", interval: 2.5, target: 10, sets: 4, rest: 10 },
+      ],
+    },
+    {
+      time: "3:20", title: "Group Poomsae with Tempo",
+      note: "Instruction first, then execute — one run-through per group, back to back. Color belts: Coach Anh, Mika, Olivia · Cadets: Coach Long · Juniors/Seniors: Coach Bo Hyeon Kim · Freestyle: Coach Huy + freestyle athletes.",
+      runs: [
+        { type: "goto", goto: "build-forms", name: "Select Poomsae",
+          detail: "Pick each group's poomsae and run it with the tempo app" },
+      ],
+    },
+    { time: "3:25", title: "Water Break" },
+    { time: "3:30", title: "Focus Groups", lead: "All staff",
+      note: "Apps as needed — each group runs its own setting. Quick plan, get moving, back together by 4:30." },
+    { time: "4:30", title: "Water Break" },
+    {
+      time: "4:35", title: "Participant Showcase", lead: "Coach Huy",
+      note: "Color belt → Cadet → Junior → Senior black belt, 1 random poomsae each · Freestyle — 5 requirements. Run the cycle again if there's time.",
+      runs: [
+        { type: "goto", goto: "randomizer", name: "Poomsae Randomizer",
+          detail: "Draw one random poomsae per group" },
+      ],
+    },
+    { time: "4:55", title: "Thank You + Group Photo", lead: "Coach Huy" },
+  ];
+
   // Belt sections. Divisions apply to Black Belt only.
   MT.SECTIONS = [
     { id: "color", label: "Color Belt" },

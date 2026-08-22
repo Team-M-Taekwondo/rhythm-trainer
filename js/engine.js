@@ -83,11 +83,10 @@
           acc += Math.max(0, (c.duration || N) - N);
         } else {
           events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent, mark: c.mark, cd: c.cd });
-          // Kick hold — AFTER the rep is done (rep > hold): the beat cues the
-          // kick, the rep's full tempo elapses while it extends, then the
-          // woodblock counts each held second, starting the moment the rep
-          // completes. The last tick is accented as the release cue, and the
-          // next rep's beat lands right after the hold lets go.
+          // Kick hold — set first, then hold: only the set's final count
+          // carries a hold (see drillToItem). Its beat cues the kick, the
+          // rep's tempo elapses while it extends, then the woodblock counts
+          // each held second. The last tick is accented as the release cue.
           const hold = c.hold > 0 ? Math.round(Math.min(10, c.hold)) : 0;
           const rep = Math.max(0.1, c.duration);
           for (let k = 1; k <= hold; k++) {
@@ -733,8 +732,9 @@
       counts.push({
         n,
         duration: drill.duration,
-        // Kick hold in seconds — woodblock ticks count it out after each kick.
-        hold: drill.hold || 0,
+        // Kick hold: on the FINAL kick of the set only — the set runs at
+        // tempo, then the last kick is held N counted seconds before the rest.
+        hold: n === drill.reps ? drill.hold || 0 : 0,
         accent: false,
         // Mark the LAST rep so the milestone triple-beep fires at the end of the set.
         mark: n === drill.reps,
