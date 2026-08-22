@@ -694,4 +694,159 @@
     }
     return a;
   }
+
+  /* ============================================================
+     Session time estimates — mirror the run flow above without
+     playing anything, so the builder screens can show a total and
+     the run screen can count down. Estimates, not stopwatch truth:
+     spoken-cue lengths use the bundled voice clips when decoded
+     (fallback guesses before that), and clip-based poomsae use the
+     same segment plan the run screen plays.
+     ============================================================ */
+
+  // Sum of a counts array, expanded exactly the way runCounts does it.
+  MT.countsDuration = function (counts) {
+    let acc = 0;
+    (counts || []).forEach((c) => {
+      if (c.tension === 5 || c.tension === 8) {
+        acc += c.tension + Math.max(0, (c.duration || c.tension) - c.tension);
+      } else {
+        acc += Math.max(0.1, c.duration);
+      }
+    });
+    return acc;
+  };
+
+  // A spoken cue's length: real clip duration when decoded, else a guess.
+  // Voice off matches say()/sayName(): a fixed 0.6s beat instead of speech.
+  function cueLen(text, fallback, settings) {
+    if (!settings.voice) return 0.6;
+    const d = MT.voiceDuration ? MT.voiceDuration(text) : 0;
+    return d || fallback;
+  }
+
+  // One full poomsae item: [announce] → Joonbi → count-in → Sijak →
+  // clip/metronome → hold → Baro → count-in → Suh (runPoomsaeItem's shape).
+  MT.estimatePoomsaeItem = function (item, settings) {
+    settings = settings || MT.loadSettings();
+    const beat = settings.countBeat || 1.0;
+    let t = 0;
+    if (item.announce) t += cueLen(item.spoken || item.name, 1.5, settings) + GAP;
+    t += cueLen(MT.CUES.joonbi.say, 0.9, settings) + 0.5 + 5 * beat;
+    t += cueLen(MT.CUES.sijak.say, 0.9, settings);
+    let perf = 0;
+    if (item.section && MT.resolveClip) {
+      const clip = MT.resolveClip(item.section, item.division, item.id);
+      if (clip && MT.clipPlan) {
+        perf = MT.clipPlan(clip.section, clip.division, clip.id, clip.rate || 1).duration;
+      }
+    }
+    if (!perf) perf = MT.countsDuration(item.counts);
+    t += perf;
+    t += 1 + cueLen(MT.CUES.baro.say, 0.9, settings) + 0.5 + 5 * beat + 0.5;
+    t += cueLen(MT.CUES.swieo.say, 0.7, settings);
+    return t;
+  };
+
+  // Drill sessions break into: countdown intro, each set (lead-in + reps),
+  // rest + Sijak between sets, and the ending (chime tail or rest + phrase).
+  function drillParts(session, settings) {
+    const item = session.items[0];
+    const sijak = cueLen(MT.CUES.sijak.say, 0.9, settings);
+    return {
+      intro: 3 + sijak,
+      set: (item.counts.length ? item.counts[0].duration : 0) + MT.countsDuration(item.counts),
+      between: session.restSeconds + sijak,
+      tail:
+        session.endMode === "chime"
+          ? 2.4
+          : session.restSeconds + cueLen("The drill has completed", 1.8, settings),
+    };
+  }
+  function countParts(session, settings) {
+    const joonbi = cueLen(MT.CUES.joonbi.say, 0.9, settings);
+    return {
+      intro: 3 + joonbi,
+      set: 1 + session.target * session.interval,
+      between: session.restSeconds + joonbi,
+      tail: 2.4,
+    };
+  }
+
+  // Average poomsae length for one Mixed round of `div` — the draw is random,
+  // so the mean over that division's pool is the honest estimate.
+  function mixedRoundAvg(div, forms, settings) {
+    const allIds = forms.map((f) => f.id);
+    const ids = (MT.MIXED_POOMSAE[div] || MT.poomsaeIdsFor("black", div, forms)).filter(
+      (id) => allIds.indexOf(id) !== -1
+    );
+    if (!ids.length) return 0;
+    let sum = 0;
+    ids.forEach((id) => {
+      const f = forms.find((x) => x.id === id);
+      sum += MT.estimatePoomsaeItem(
+        { id: f.id, name: f.name, spoken: f.spoken, counts: f.counts, announce: true, section: "black", division: div },
+        settings
+      );
+    });
+    return sum / ids.length;
+  }
+
+  // Total estimated seconds for a session object (same shape startRun takes).
+  MT.estimateSession = function (session) {
+    const settings = MT.loadSettings();
+    if (session.kind === "drill" || session.kind === "count") {
+      const p = session.kind === "drill" ? drillParts(session, settings) : countParts(session, settings);
+      return p.intro + session.sets * p.set + (session.sets - 1) * p.between + p.tail;
+    }
+    if (session.kind === "mixed") {
+      const forms = MT.loadForms();
+      const order = MT.CLIP_DIVISIONS.filter((id) => session.divisions.indexOf(id) !== -1);
+      if (!order.length) return 0;
+      let t = 0;
+      for (let r = 0; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings);
+      return t + Math.max(0, session.rounds - 1) * session.switchSeconds;
+    }
+    let per = 0;
+    session.items.forEach((it) => (per += MT.estimatePoomsaeItem(it, settings)));
+    const n = session.sets * session.items.length;
+    return per * session.sets + Math.max(0, n - 1) * session.restSeconds;
+  };
+
+  // Estimated seconds from the START of the item onItem just announced to the
+  // end of the session. The run screen re-anchors its countdown here on every
+  // item, so a Skip snaps the clock back to something honest, and Mixed can
+  // use the actually-drawn poomsae instead of the pool average.
+  MT.estimateRemaining = function (session, info) {
+    const settings = MT.loadSettings();
+    if (session.kind === "drill" || session.kind === "count") {
+      const p = session.kind === "drill" ? drillParts(session, settings) : countParts(session, settings);
+      const left = session.sets - info.set; // full sets after this one
+      return (info.set === 1 ? p.intro : 0) + (left + 1) * p.set + left * p.between + p.tail;
+    }
+    if (session.kind === "mixed") {
+      const forms = MT.loadForms();
+      const order = MT.CLIP_DIVISIONS.filter((id) => session.divisions.indexOf(id) !== -1);
+      if (!order.length) return 0;
+      let t = 0;
+      const f = forms.find((x) => x.id === info.id);
+      if (f) {
+        t += MT.estimatePoomsaeItem(
+          { id: f.id, name: f.name, spoken: f.spoken, counts: f.counts, announce: true, section: "black", division: info.division },
+          settings
+        );
+      }
+      for (let r = info.set; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings);
+      return t + (session.rounds - info.set) * session.switchSeconds;
+    }
+    const items = session.items;
+    const n = session.sets * items.length;
+    const pos = (info.set - 1) * items.length + (info.item - 1); // 0-based
+    let t = 0;
+    for (let i = info.item - 1; i < items.length; i++) t += MT.estimatePoomsaeItem(items[i], settings);
+    for (let s = info.set; s < session.sets; s++) {
+      items.forEach((it) => (t += MT.estimatePoomsaeItem(it, settings)));
+    }
+    return t + Math.max(0, n - 1 - pos) * session.restSeconds;
+  };
 })();

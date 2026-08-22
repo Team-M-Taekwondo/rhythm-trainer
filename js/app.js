@@ -137,6 +137,71 @@
     const ids = MT.poomsaeIdsFor(section, division, all);
     return all.filter((f) => ids.indexOf(f.id) !== -1);
   }
+  // A form as the run-item shape the estimator expects.
+  function formItemFor(f, section, division) {
+    return {
+      id: f.id,
+      name: f.name,
+      spoken: f.spoken || f.name,
+      counts: f.counts,
+      announce: true,
+      section,
+      division: section === "black" ? division : "",
+    };
+  }
+  // Total-time line under the builder — recomputed on every selection change.
+  function updateFormsEst() {
+    const el = $("#forms-est");
+    if (!el) return;
+    if (formsSection === "black" && formsDivision === "mixed") {
+      const divisions = $$("#mixed-divisions input:checked").map((c) => c.value);
+      if (!divisions.length) {
+        el.textContent = "";
+        return;
+      }
+      const t = MT.estimateSession({
+        kind: "mixed",
+        divisions,
+        rounds: Math.max(1, Number($("#mixed-rounds").value) || 1),
+        switchSeconds: Math.max(0, Number($("#mixed-switch").value) || 0),
+      });
+      el.textContent = "Est. total: ~" + MT.fmtTime(t) + " · varies with the draw";
+      return;
+    }
+    const settings = MT.loadSettings();
+    const rest = Math.max(0, Number($("#forms-rest").value) || 0);
+    const mode = $("#forms-mode .seg-btn.active").dataset.mode;
+    if (mode === "pick") {
+      const ids = $$("#forms-checklist input:checked").map((c) => Number(c.value));
+      if (!ids.length) {
+        el.textContent = "Pick poomsae to see a total time.";
+        return;
+      }
+      const all = MT.loadForms();
+      let t = 0;
+      ids.forEach((id) => {
+        const f = all.find((x) => x.id === id);
+        if (f) t += MT.estimatePoomsaeItem(formItemFor(f, formsSection, formsDivision), settings);
+      });
+      t += Math.max(0, ids.length - 1) * rest;
+      el.textContent = "Est. total: ~" + MT.fmtTime(t);
+    } else {
+      const from = Number($("#rand-from").value);
+      const to = Number($("#rand-to").value);
+      const count = Math.max(1, Number($("#rand-count").value) || 1);
+      const pool = sectionForms(formsSection, formsDivision).filter((f) => f.id >= from && f.id <= to);
+      if (from > to || !pool.length) {
+        el.textContent = "";
+        return;
+      }
+      // Random draw — average the pool, since each poomsae runs a different length.
+      let avg = 0;
+      pool.forEach((f) => (avg += MT.estimatePoomsaeItem(formItemFor(f, formsSection, formsDivision), settings)));
+      avg /= pool.length;
+      el.textContent =
+        "Est. total: ~" + MT.fmtTime(count * avg + Math.max(0, count - 1) * rest) + " · varies with the draw";
+    }
+  }
   function renderFormsBuilder() {
     forms = MT.loadForms();
     $$("#forms-section .seg-btn").forEach((b) =>
@@ -160,9 +225,11 @@
           return `<label class="check-item"><input type="checkbox" value="${id}" checked /><span class="ci-name">${label}</span></label>`;
         }).join("");
       }
+      updateFormsEst();
       return;
     }
 
+    const estSettings = MT.loadSettings();
     const secForms = sectionForms(formsSection, formsDivision);
     $("#forms-checklist").innerHTML = secForms
       .map(
@@ -170,7 +237,9 @@
       <label class="check-item">
         <input type="checkbox" value="${f.id}" />
         <span class="ci-name">${f.id}. ${f.name}</span>
-        <span class="ci-meta">${f.movements} Pooms</span>
+        <span class="ci-meta">${f.movements} Pooms · ~${MT.fmtTime(
+          MT.estimatePoomsaeItem(formItemFor(f, formsSection, formsDivision), estSettings)
+        )}</span>
       </label>`
       )
       .join("");
@@ -182,6 +251,7 @@
     $("#rand-to").innerHTML = opts;
     $("#rand-from").value = secForms[0].id;
     $("#rand-to").value = secForms[secForms.length - 1].id;
+    updateFormsEst();
   }
   $$("#forms-section .seg-btn").forEach((btn) =>
     btn.addEventListener("click", () => {
@@ -201,8 +271,19 @@
       const random = btn.dataset.mode === "random";
       $("#forms-random").classList.toggle("hidden", !random);
       $("#forms-pick").classList.toggle("hidden", random);
+      updateFormsEst();
     })
   );
+
+  // Keep the total-time line live as the selection changes.
+  $("#forms-checklist").addEventListener("change", updateFormsEst);
+  $("#forms-rest").addEventListener("input", updateFormsEst);
+  $("#rand-from").addEventListener("change", updateFormsEst);
+  $("#rand-to").addEventListener("change", updateFormsEst);
+  $("#rand-count").addEventListener("input", updateFormsEst);
+  $("#mixed-divisions").addEventListener("change", updateFormsEst);
+  $("#mixed-rounds").addEventListener("input", updateFormsEst);
+  $("#mixed-switch").addEventListener("input", updateFormsEst);
 
   $("#start-forms").addEventListener("click", () => {
     MT.unlockAudio();
@@ -253,7 +334,30 @@
   function renderDrillBuilder() {
     fillTempoSelect($("#drill-tempo"), 0.8, "", MT.DRILL_TEMPOS);
     renderDrillSoundChips();
+    updateDrillEst();
   }
+  function updateDrillEst() {
+    const el = $("#drill-est");
+    if (!el) return;
+    const t = MT.estimateSession({
+      kind: "drill",
+      items: [
+        MT.drillToItem({
+          name: "Drill",
+          reps: Math.max(1, Number($("#drill-reps").value) || 1),
+          duration: Number($("#drill-tempo").value) || 0.8,
+          sound: drillSound,
+        }),
+      ],
+      sets: Math.max(1, Number($("#drill-sets").value) || 1),
+      restSeconds: Math.max(0, Number($("#drill-rest").value) || 0),
+    });
+    el.textContent = "Est. total: ~" + MT.fmtTime(t);
+  }
+  $("#drill-reps").addEventListener("input", updateDrillEst);
+  $("#drill-tempo").addEventListener("change", updateDrillEst);
+  $("#drill-sets").addEventListener("input", updateDrillEst);
+  $("#drill-rest").addEventListener("input", updateDrillEst);
   function renderDrillSoundChips() {
     $("#drill-sound-chips").innerHTML = MT.SOUNDS.map(
       (s) =>
@@ -316,6 +420,16 @@
         `<button class="seg-btn ${l.id === presetLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
     ).join("");
   }
+  // Total run time of a preset at the current level (1 round, as listed).
+  function presetEstimate(d, tempo) {
+    return MT.estimateSession({
+      kind: "drill",
+      items: [MT.drillToItem({ name: d.name, reps: d.reps, duration: tempo, sound: "woodblock" })],
+      sets: d.sets,
+      restSeconds: d.rest,
+      endMode: d.end,
+    });
+  }
   function renderPresetList() {
     renderLevelSeg("#preset-level");
     const groups = [];
@@ -335,7 +449,7 @@
               (d) => `
             <button class="preset-row" data-preset="${d.id}">
               <span class="pr-name">${d.name}</span>
-              <span class="pr-meta">${levelTempo(d.tempo).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest</span>
+              <span class="pr-meta">${levelTempo(d.tempo).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest · ~${MT.fmtTime(presetEstimate(d, levelTempo(d.tempo)))}</span>
             </button>`
             )
             .join("")}
@@ -367,14 +481,42 @@
     $("#preset-sets").value = d.sets;
     $("#preset-rest").value = d.rest;
     $("#preset-rounds").value = 1;
+    updatePresetEst();
     show("preset-config");
   }
+  function updatePresetEst() {
+    const el = $("#preset-est");
+    if (!el || !presetDrill) return;
+    const setsPerRound = Math.max(1, Number($("#preset-sets").value) || 1);
+    const rounds = Math.max(1, Number($("#preset-rounds").value) || 1);
+    const t = MT.estimateSession({
+      kind: "drill",
+      items: [
+        MT.drillToItem({
+          name: presetDrill.name,
+          reps: Math.max(1, Number($("#preset-reps").value) || 1),
+          duration: Number($("#preset-tempo").value) || levelTempo(presetDrill.tempo),
+          sound: presetSound,
+        }),
+      ],
+      sets: setsPerRound * rounds,
+      restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
+      endMode: presetDrill.end,
+    });
+    el.textContent = "Est. total: ~" + MT.fmtTime(t);
+  }
+  $("#preset-tempo").addEventListener("change", updatePresetEst);
+  $("#preset-reps").addEventListener("input", updatePresetEst);
+  $("#preset-sets").addEventListener("input", updatePresetEst);
+  $("#preset-rest").addEventListener("input", updatePresetEst);
+  $("#preset-rounds").addEventListener("input", updatePresetEst);
   $("#preset-cfg-level").addEventListener("click", (e) => {
     const b = e.target.closest("[data-level]");
     if (!b || !presetDrill) return;
     presetLevel = b.dataset.level;
     renderLevelSeg("#preset-cfg-level");
     $("#preset-tempo").value = levelTempo(presetDrill.tempo);
+    updatePresetEst();
   });
   $("#start-preset").addEventListener("click", () => {
     if (!presetDrill) return;
@@ -412,7 +554,23 @@
     renderCountLevelSeg();
     renderCountChips();
     fillTempoSelect($("#count-custom"), countInterval, "", MT.DRILL_TEMPOS);
+    updateCountEst();
   }
+  function updateCountEst() {
+    const el = $("#count-est");
+    if (!el) return;
+    const t = MT.estimateSession({
+      kind: "count",
+      target: Math.max(1, Number($("#count-target").value) || 10),
+      interval: countInterval,
+      sets: Math.max(1, Number($("#count-sets").value) || 1),
+      restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
+    });
+    el.textContent = "Est. total: ~" + MT.fmtTime(t);
+  }
+  $("#count-target").addEventListener("input", updateCountEst);
+  $("#count-sets").addEventListener("input", updateCountEst);
+  $("#count-rest").addEventListener("input", updateCountEst);
   function renderCountLevelSeg() {
     $("#count-level").innerHTML = MT.COUNT_LEVELS.map(
       (l) =>
@@ -439,6 +597,7 @@
     }
     renderCountLevelSeg();
     renderCountChips();
+    updateCountEst();
   });
   $("#count-intervals").addEventListener("click", (e) => {
     const chip = e.target.closest("[data-int]");
@@ -446,10 +605,12 @@
     countInterval = countTempo(Number(chip.dataset.int));
     renderCountChips();
     $("#count-custom").value = countInterval;
+    updateCountEst();
   });
   $("#count-custom").addEventListener("change", (e) => {
     countInterval = Number(e.target.value);
     renderCountChips(); // active chip follows only if it matches a preset
+    updateCountEst();
   });
   $("#start-count").addEventListener("click", () => {
     MT.unlockAudio();
@@ -592,6 +753,15 @@
 
   let currentSession = null;
   let runFromScreen = "home"; // where Stop/× returns to — the screen that launched the run
+
+  // Whole-session countdown ticker. MT.now() is the audio clock, which
+  // freezes on Pause — so the countdown holds in place for free.
+  let runTimerId = 0;
+  function stopRunTimer() {
+    if (runTimerId) clearInterval(runTimerId);
+    runTimerId = 0;
+  }
+
   function startRun(session) {
     currentSession = session;
     const active = document.querySelector(".screen.active");
@@ -618,8 +788,23 @@
     // Show the tempo this session runs at (drills & counting).
     $("#run-tempo").textContent = session.tempoLabel || "";
 
+    // Estimated time left in the whole session. Re-anchored on every item so
+    // Skip (and Mixed's random draws) snap the clock back to something honest.
+    const elTimeLeft = $("#run-timeleft");
+    stopRunTimer();
+    let estLeft = MT.estimateSession(session);
+    let estAnchor = MT.now();
+    const drawTimeLeft = () => {
+      elTimeLeft.textContent =
+        "~" + MT.fmtTime(Math.max(0, estLeft - (MT.now() - estAnchor))) + " left";
+    };
+    drawTimeLeft();
+    runTimerId = setInterval(drawTimeLeft, 250);
+
     MT.runSession(session, {
       onItem(info) {
+        estLeft = MT.estimateRemaining(session, info);
+        estAnchor = MT.now();
         // Preset drills run rounds × sets; show both when rounds are in play.
         const spr = session.setsPerRound;
         if (spr && session.rounds > 1) {
@@ -706,6 +891,8 @@
         elCount.textContent = "✓";
         elMax.textContent = "";
         document.body.dataset.phase = "done";
+        stopRunTimer();
+        elTimeLeft.textContent = "";
         releaseWakeLock(); // session over — let the screen sleep normally again
       },
     });
@@ -713,6 +900,7 @@
 
   function exitRun() {
     MT.stopSession();
+    stopRunTimer();
     releaseWakeLock();
     document.body.classList.remove("running");
     document.body.dataset.phase = "";
@@ -1496,15 +1684,29 @@
     setTimeout(() => (el.textContent = old), 1200);
   }
 
+  // Time estimates depend on audio durations that decode after first render
+  // (and on iOS only after the first tap) — refresh whatever's on screen once
+  // the real durations exist.
+  function refreshEstimates() {
+    const active = document.querySelector(".screen.active");
+    if (!active) return;
+    const name = active.dataset.screen;
+    if (name === "build-forms") renderFormsBuilder();
+    else if (name === "build-drill") updateDrillEst();
+    else if (name === "build-count") updateCountEst();
+    else if (name === "preset-drills") renderPresetList();
+    else if (name === "preset-config") updatePresetEst();
+  }
+
   // Initialize voice choice + tuning on load, and preload recorded name clips.
   MT.setVoiceURI(settings.voiceURI);
   MT.setVoiceTuning(settings);
   // Load the team's shipped clips from the repo, then the admin's local
   // uploads (which take precedence for authoring/preview).
-  if (MT.loadClips) MT.loadClips().then(() => MT.loadRepoClips && MT.loadRepoClips());
-  else if (MT.loadRepoClips) MT.loadRepoClips();
+  if (MT.loadClips) MT.loadClips().then(() => MT.loadRepoClips && MT.loadRepoClips()).then(refreshEstimates);
+  else if (MT.loadRepoClips) MT.loadRepoClips().then(refreshEstimates);
   // Published speed matches (division → U30 base at an adjusted speed).
   if (MT.loadTempoMap) MT.loadTempoMap();
   // Bundled voice clips (numbers/commands/names) — natural Yuna recordings.
-  if (MT.loadVoiceClips) MT.loadVoiceClips();
+  if (MT.loadVoiceClips) MT.loadVoiceClips().then(refreshEstimates);
 })();

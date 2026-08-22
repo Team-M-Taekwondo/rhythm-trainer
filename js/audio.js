@@ -325,6 +325,14 @@
     });
   }
 
+  // Duration of a bundled voice clip in seconds (0 when missing or not yet
+  // decoded) — the session-time estimator uses real cue lengths when it can.
+  MT.voiceDuration = function (text) {
+    const key = VOICE_FILES[text];
+    const buf = key && VOICE_CACHE.get(key);
+    return buf ? buf.duration : 0;
+  };
+
   /* -------------------- Voice cues -------------------- */
 
   // Rank Korean voices by likely quality. Network / named / "enhanced" voices

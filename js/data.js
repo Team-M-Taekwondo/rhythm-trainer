@@ -41,6 +41,15 @@
     return MT.KO_NUMBERS_10[ones - 1];
   };
 
+  // Seconds → "M:SS" (or "H:MM:SS") for the session-time estimates.
+  MT.fmtTime = function (sec) {
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = String(sec % 60).padStart(2, "0");
+    return h ? h + ":" + String(m).padStart(2, "0") + ":" + s : m + ":" + s;
+  };
+
   // Available metronome sounds (synthesized in audio.js — no files needed).
   MT.SOUNDS = [
     { id: "woodblock", label: "Wood block" },
