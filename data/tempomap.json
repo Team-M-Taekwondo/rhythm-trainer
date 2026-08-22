@@ -140,6 +140,12 @@
     },
     {
       "section": "black",
+      "division": "o30",
+      "poomsae": 14,
+      "speed": 1
+    },
+    {
+      "section": "black",
       "division": "u30",
       "poomsae": 1,
       "speed": 1.04
