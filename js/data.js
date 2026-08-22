@@ -105,7 +105,7 @@
                shifts it ±0.1s, same as Team Presets
        count — interval stored at the comp reference; levels add +0.5/+1.0
        goto  — jumps to another screen (nothing to preset)
-     rounds > 1 means one round per technique the coach calls out. */
+     Every technique on the schedule gets its own one-tap drill set. */
   MT.CAMP_BLOCKS = [
     { time: "1:00", title: "Opening", lead: "Coach Huy",
       note: "Welcome + intros · 3 Team USA performances · rundown of the afternoon" },
@@ -140,11 +140,14 @@
     },
     {
       time: "2:30", title: "Intermediate Rhythm & Tempo — Hands", lead: "Coach Long",
-      note: "All stances, in place + up/down — back stance outward block / single / double knife hand · front stance punch or palm strike · front stance low block or Sipjin double punch · walking stance inward block or Tiger stance T7 palm strike.",
+      note: "All stances, in place + up/down — each technique runs its own 2 sets of 16.",
       runs: [
-        { type: "drill", preset: "inplace", name: "In Place · All Stances", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udblock", name: "Up / Down · Blocks", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udattack", name: "Up / Down · Attacks", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udblock", name: "Back Stance · Outward Block", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udblock", name: "Back Stance · Single Knife Hand", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udblock", name: "Back Stance · Double Knife Hand", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udattack", name: "Front Stance · Punch / Palm Strike", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udblock", name: "Front Stance · Low Block / Sipjin Double Punch", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
+        { type: "drill", preset: "udblock", name: "Walking Stance · Inward Block / Tiger Stance · T7 Palm Strike", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
       ],
     },
     { time: "2:50", title: "Water Break" },
