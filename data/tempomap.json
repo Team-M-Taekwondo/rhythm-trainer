@@ -422,5 +422,67 @@
         ]
       ]
     }
+  ],
+  "intros": [
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 4,
+      "end": 11.4
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 6,
+      "end": 14.4
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 7,
+      "end": 10.8
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 8,
+      "end": 5.1
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 9,
+      "end": 16.1
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 10,
+      "end": 11.1
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 11,
+      "end": 12.5
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 12,
+      "end": 18
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 13,
+      "end": 28.5
+    },
+    {
+      "section": "black",
+      "division": "u30",
+      "poomsae": 14,
+      "end": 45
+    }
   ]
 }

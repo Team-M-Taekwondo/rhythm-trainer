@@ -1738,8 +1738,29 @@
       manifest.clips.push({ section, division, poomsae: id, file });
     }
     // Only ship clips.json when this device actually has uploads — an empty
-    // manifest would wipe the repo's shipped clips on unzip.
+    // manifest would wipe the repo's shipped clips on unzip. And merge with
+    // the published manifest: a device holding just a few local uploads must
+    // not wipe the entries for every other shipped clip (the zip only
+    // overwrites the files it contains, so published entries stay valid).
     if (clips.length) {
+      try {
+        const res = await fetch("data/clips.json?ts=" + Date.now());
+        if (res.ok) {
+          const repo = await res.json();
+          const have = new Set(
+            manifest.clips.map((c) => MT.clipKey(c.section, c.division || "", c.poomsae))
+          );
+          ((repo && repo.clips) || []).forEach((c) => {
+            if (!have.has(MT.clipKey(c.section, c.division || "", c.poomsae))) manifest.clips.push(c);
+          });
+        }
+      } catch (e) {}
+      manifest.clips.sort(
+        (a, b) =>
+          a.section.localeCompare(b.section) ||
+          (a.division || "").localeCompare(b.division || "") ||
+          a.poomsae - b.poomsae
+      );
       files.push({
         name: "data/clips.json",
         data: new TextEncoder().encode(JSON.stringify(manifest, null, 2) + "\n"),
