@@ -364,6 +364,14 @@ body.running { background: #000; }
 .run-countmax { color: var(--muted); font-size: clamp(16px, 4vw, 24px); }
 
 .run-bottom { display: flex; flex-direction: column; gap: 16px; }
+/* Camp queue: the upcoming drill stays visible during the live run so the
+   coach can see what's next while walking athletes through this one. */
+.run-upnext {
+  text-align: center; color: var(--gold-soft); font-size: 14px; font-weight: 700;
+  border: 1px solid rgba(231, 177, 10, 0.35); border-radius: 999px;
+  padding: 9px 16px; margin-bottom: -4px;
+  background: rgba(231, 177, 10, 0.08);
+}
 /* Camp queue: appears when a drill finishes with another one lined up. */
 .run-next {
   width: 100%; padding: 16px; font-size: 16px; font-weight: 800; letter-spacing: 0.01em;

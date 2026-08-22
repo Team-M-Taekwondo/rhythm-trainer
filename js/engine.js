@@ -430,8 +430,11 @@
   }
 
   /* ---- Poomsae Intro drill: each selected poomsae's opening section on
-     repeat, at the division's tempo. Per rep: Joonbi → Sijak → clip up to the
-     marked drill end → Baro → rest (silent) → 3-2-1 in Korean → next rep.
+     repeat, at the division's tempo. Per rep: Joonbi → (first rep only:
+     Korean 5-count) → Sijak → clip up to the marked drill end → Seo →
+     rest (silent) → 3-2-1 in Korean → next rep. Seo, not Baro — Baro would
+     trigger the recovery-count habit from the full poomsae drills; Seo just
+     sends athletes walking back to their starting point for the next rep.
      The name is announced once per poomsae; ends with the finish chime. ---- */
   async function runPoomsaeDrill(session, player, cb, settings) {
     const totalItems = session.items.length;
@@ -459,15 +462,28 @@
         cb.onPhase("joonbi", "Joonbi");
         await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
         if (player.cancelled) return;
-        await wait(0.5, player); // brief beat before the start call
+        if (r === 0) {
+          // First rep only: Korean 5-count after Joonbi so athletes can set
+          // their stance, mirroring how the full poomsae drills open.
+          for (let n = 5; n >= 1; n--) {
+            if (stopped(player)) break;
+            cb.onPhase("countdown", "", n);
+            sayCountdown(n, settings);
+            await wait(1, player);
+          }
+          if (player.cancelled) return;
+        } else {
+          await wait(0.5, player); // brief beat before the start call
+        }
         cb.onPhase("sijak", "Sijak");
         await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
         if (player.cancelled) return;
         cb.onPhase("go", item.name);
         await playClip(item, player, cb); // item.intro cuts it at the drill end
         if (player.cancelled) return;
-        cb.onPhase("baro", "Baro");
-        await say(MT.CUES.baro.say, player, settings, STYLE.baro);
+        // Seo (not Baro): walk back to the starting point for the next rep.
+        cb.onPhase("relax", "Seo");
+        await say(MT.CUES.swieo.say, player, settings, STYLE.swieo);
         if (player.cancelled) return;
         const isLast = it === totalItems - 1 && r === session.reps - 1;
         if (!isLast) {
@@ -866,12 +882,15 @@
   }
 
   // Poomsae Intro drill: fixed cue overhead of one rep (Joonbi → Sijak →
-  // …intro… → Baro) and the heard length of one poomsae's intro.
+  // …intro… → Seo) and the heard length of one poomsae's intro.
+  // The first rep of each poomsae swaps the 0.5s beat for a 5s Korean
+  // count — PDRILL_FIRST_REP is that difference, added once per poomsae.
+  const PDRILL_FIRST_REP = 4.5;
   function pdrillCycle(settings) {
     return (
       cueLen(MT.CUES.joonbi.say, 0.9, settings) + 0.5 +
       cueLen(MT.CUES.sijak.say, 0.9, settings) +
-      cueLen(MT.CUES.baro.say, 0.9, settings)
+      cueLen(MT.CUES.swieo.say, 0.9, settings)
     );
   }
   function pdrillHeard(item) {
@@ -908,7 +927,7 @@
       const cyc = pdrillCycle(settings);
       let t = 0;
       session.items.forEach((it) => {
-        t += cueLen(it.spoken || it.name, 1.5, settings) + GAP + session.reps * (cyc + pdrillHeard(it));
+        t += cueLen(it.spoken || it.name, 1.5, settings) + GAP + PDRILL_FIRST_REP + session.reps * (cyc + pdrillHeard(it));
       });
       const totalReps = session.reps * session.items.length;
       return t + Math.max(0, totalReps - 1) * (session.restSeconds + 3) + (totalReps > 1 ? 2.4 : 0);
@@ -942,11 +961,11 @@
       const cyc = pdrillCycle(settings);
       const items = session.items;
       const cur = items[info.item - 1];
-      let t = info.set === 1 ? cueLen(cur.spoken || cur.name, 1.5, settings) + GAP : 0;
+      let t = info.set === 1 ? cueLen(cur.spoken || cur.name, 1.5, settings) + GAP + PDRILL_FIRST_REP : 0;
       let repsLeft = session.reps - info.set + 1; // reps of the current poomsae
       t += repsLeft * (cyc + pdrillHeard(cur));
       for (let i = info.item; i < items.length; i++) {
-        t += cueLen(items[i].spoken || items[i].name, 1.5, settings) + GAP + session.reps * (cyc + pdrillHeard(items[i]));
+        t += cueLen(items[i].spoken || items[i].name, 1.5, settings) + GAP + PDRILL_FIRST_REP + session.reps * (cyc + pdrillHeard(items[i]));
         repsLeft += session.reps;
       }
       const chime = session.reps * items.length > 1 ? 2.4 : 0;

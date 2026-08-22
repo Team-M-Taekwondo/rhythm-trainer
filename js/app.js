@@ -1118,6 +1118,12 @@
     elCount.textContent = "0";
     elMax.textContent = "";
     $("#run-next").hidden = true; // only shows once the drill finishes
+    // Camp queue: keep the upcoming drill on screen during the live run, so
+    // the coach knows what's coming while walking athletes through this one.
+    const upNext = nextCampRun(session.campNext);
+    const elUpNext = $("#run-upnext");
+    elUpNext.hidden = !upNext;
+    if (upNext) elUpNext.textContent = "Up next: " + upNext.run.name;
     // Show the tempo this session runs at (drills & counting).
     $("#run-tempo").textContent = session.tempoLabel || "";
 
@@ -1242,6 +1248,7 @@
         // tap — instructors get their time to explain between drills.
         const next = nextCampRun(session.campNext);
         if (next) {
+          $("#run-upnext").hidden = true; // the Start Next button takes over
           elTitle.textContent = "Next: " + next.run.name;
           const nb = $("#run-next");
           nb.textContent = "Start Next: " + next.run.name + " ›";
