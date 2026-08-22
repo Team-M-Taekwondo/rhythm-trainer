@@ -105,6 +105,12 @@
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
     window.scrollTo(0, 0);
   }
+  // Point a screen's back arrow at a different screen — config screens opened
+  // from the camp page should return to the camp page, not their usual home.
+  function setBackButton(screen, dest) {
+    const btn = $(`.screen[data-screen="${screen}"] .topbar .icon-btn`);
+    if (btn) btn.dataset.goto = dest;
+  }
   document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-goto]");
     if (t) {
@@ -116,8 +122,13 @@
       if (dest === "build-forms") renderFormsBuilder();
       if (dest === "build-drill") renderDrillBuilder();
       if (dest === "preset-drills") renderPresetList();
-      if (dest === "build-count") renderCountBuilder();
+      if (dest === "build-count") {
+        renderCountBuilder();
+        setBackButton("build-count", "drills"); // normal entry — back to the hub
+        campRunCtx = null; // not part of a camp block's queue
+      }
       if (dest === "randomizer") renderRandomizer();
+      if (dest === "camp") renderCamp();
       if (dest === "build-pdrill") {
         // The list depends on decoded audio — this tap is a user gesture, so
         // unlock, decode anything pending (iOS), then render with real data.
@@ -491,21 +502,28 @@
     if (!row) return;
     openPresetConfig(row.dataset.preset);
   });
-  function openPresetConfig(id) {
+  // opts (all optional) let the camp page open this screen prefilled with its
+  // own variables: { title, tempo, reps, sets, rounds, rest, hold, backTo }.
+  let presetRunName = null; // display/run name when it differs from the preset's
+  function openPresetConfig(id, opts) {
     const d = MT.PRESET_DRILLS.find((x) => x.id === id);
     if (!d) return;
+    opts = opts || {};
     presetDrill = d;
-    $("#preset-title").textContent = d.name;
+    presetRunName = opts.title || null;
+    $("#preset-title").textContent = opts.title || d.name;
     renderLevelSeg("#preset-cfg-level");
-    fillTempoSelect($("#preset-tempo"), levelTempo(d.tempo), "", MT.DRILL_TEMPOS);
+    fillTempoSelect($("#preset-tempo"), opts.tempo != null ? opts.tempo : levelTempo(d.tempo), "", MT.DRILL_TEMPOS);
     renderPresetSoundChips();
-    $("#preset-reps").value = d.reps;
-    $("#preset-sets").value = d.sets;
-    $("#preset-rest").value = d.rest;
-    $("#preset-rounds").value = 1;
+    $("#preset-reps").value = opts.reps != null ? opts.reps : d.reps;
+    $("#preset-sets").value = opts.sets != null ? opts.sets : d.sets;
+    $("#preset-rest").value = opts.rest != null ? opts.rest : d.rest;
+    $("#preset-rounds").value = opts.rounds != null ? opts.rounds : 1;
     // Kick hold — only makes sense on the kicking (ground) drills.
     $("#preset-hold-wrap").hidden = !d.kick;
-    fillHoldSelect($("#preset-hold"), 0);
+    fillHoldSelect($("#preset-hold"), opts.hold || 0);
+    campRunCtx = opts.campCtx || null; // camp opens carry their queue position
+    setBackButton("preset-config", opts.backTo || "preset-drills");
     updatePresetEst();
     show("preset-config");
   }
@@ -520,7 +538,7 @@
       kind: "drill",
       items: [
         MT.drillToItem({
-          name: presetDrill.name,
+          name: presetRunName || presetDrill.name,
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: Number($("#preset-tempo").value) || levelTempo(presetDrill.tempo),
           hold: presetHold(),
@@ -556,7 +574,7 @@
       kind: "drill",
       items: [
         MT.drillToItem({
-          name: presetDrill.name,
+          name: presetRunName || presetDrill.name,
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: tempo,
           hold: presetHold(),
@@ -568,6 +586,7 @@
       rounds,
       restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
       tempoLabel: tempo.toFixed(1) + "s / rep",
+      campNext: campRunCtx || undefined, // queue position when run from the camp page
     });
   });
 
@@ -649,6 +668,7 @@
       sets: Math.max(1, Number($("#count-sets").value) || 1),
       restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
       tempoLabel: countInterval.toFixed(1) + "s / count",
+      campNext: campRunCtx || undefined, // queue position when run from the camp page
     });
   });
 
@@ -826,6 +846,189 @@
     }
   });
 
+  /* -------------------- TEAM USA CAMP (run of show) -------------------- */
+  let campLevel = "black";
+  // Which camp run the open config screen came from — the started session
+  // carries it (campNext) so the run screen can offer the block's next drill.
+  let campRunCtx = null;
+  const campDrillDelta = () =>
+    (MT.PRESET_LEVELS.find((l) => l.id === campLevel) || {}).delta || 0;
+  const campCountDelta = () =>
+    (MT.COUNT_LEVELS.find((l) => l.id === campLevel) || {}).delta || 0;
+  // Level moves tempo only, same rules as Team Presets / General Counting.
+  const campDrillTempo = (base) => Math.max(0.1, Math.round((base + campDrillDelta()) * 10) / 10);
+  const campCountInt = (base) => Math.max(0.1, Math.round((base + campCountDelta()) * 10) / 10);
+
+  // The ready-to-start session for a camp run entry (drill or count).
+  function campSession(run) {
+    if (run.type === "drill") {
+      const preset = MT.PRESET_DRILLS.find((d) => d.id === run.preset) || {};
+      const tempo = campDrillTempo(preset.tempo || 1);
+      const setsPerRound = run.setsPerRound || 1;
+      const rounds = run.rounds || 1;
+      return {
+        kind: "drill",
+        items: [
+          MT.drillToItem({
+            name: run.name,
+            reps: run.reps,
+            duration: tempo,
+            hold: run.hold || 0,
+            sound: "woodblock",
+          }),
+        ],
+        sets: setsPerRound * rounds,
+        setsPerRound,
+        rounds,
+        restSeconds: run.rest || 0,
+        tempoLabel: tempo.toFixed(1) + "s / rep",
+      };
+    }
+    if (run.type === "count") {
+      const interval = campCountInt(run.interval);
+      return {
+        kind: "count",
+        target: run.target,
+        interval,
+        sets: run.sets,
+        restSeconds: run.rest || 0,
+        tempoLabel: interval.toFixed(1) + "s / count",
+      };
+    }
+    return null;
+  }
+
+  function campMeta(run) {
+    const s = campSession(run);
+    if (!s) return "";
+    const est = " · ~" + MT.fmtTime(MT.estimateSession(s));
+    if (run.type === "count") {
+      return s.interval.toFixed(1) + "s count · to " + run.target + " · " + run.sets + " sets · " + run.rest + "s rest" + est;
+    }
+    const tempo = s.items[0].counts[0].duration;
+    const rounds = (run.rounds || 1) > 1 ? " × " + run.rounds + " rounds" : "";
+    const hold = run.hold ? " · " + run.hold + "s hold" : "";
+    return tempo.toFixed(1) + "s tempo · " + run.reps + " reps · " + (run.setsPerRound || 1) + " sets" + rounds + hold + " · " + run.rest + "s rest" + est;
+  }
+
+  function renderCampLevel() {
+    $("#camp-level").innerHTML = MT.PRESET_LEVELS.map(
+      (l) =>
+        `<button class="seg-btn ${l.id === campLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
+    ).join("");
+  }
+
+  function renderCamp() {
+    renderCampLevel();
+    $("#camp-list").innerHTML = MT.CAMP_BLOCKS.map((b, bi) => {
+      // Schedule-only block — no app to run, just keep the timeline visible.
+      if (!b.runs) {
+        return `
+        <div class="camp-plain">
+          <span class="camp-time">${b.time}</span>
+          <div>
+            <span class="camp-title">${b.title}</span>${b.lead ? `<span class="camp-lead"> · ${b.lead}</span>` : ""}
+            ${b.note ? `<span class="camp-note">${b.note}</span>` : ""}
+          </div>
+        </div>`;
+      }
+      return `
+      <div class="panel camp-panel">
+        <h2><span class="camp-time">${b.time}</span>${b.title}${b.lead ? ` · ${b.lead}` : ""}</h2>
+        ${b.note ? `<p class="hint camp-blocknote">${b.note}</p>` : ""}
+        <div class="checklist">
+          ${b.runs
+            .map((r, ri) => {
+              // goto rows ride the global data-goto handler.
+              if (r.type === "goto") {
+                return `
+              <button class="preset-row" data-goto="${r.goto}">
+                <span class="pr-name">${r.name}</span>
+                ${r.detail ? `<span class="pr-detail">${r.detail}</span>` : ""}
+              </button>`;
+              }
+              return `
+              <button class="preset-row" data-camp="${bi}:${ri}">
+                <span class="pr-name">${r.name}</span>
+                <span class="pr-meta">${campMeta(r)}</span>
+                ${r.detail ? `<span class="pr-detail">${r.detail}</span>` : ""}
+              </button>`;
+            })
+            .join("")}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  $("#camp-level").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-level]");
+    if (!b) return;
+    campLevel = b.dataset.level;
+    renderCamp();
+  });
+
+  // Open one camp run: drill → prefilled preset config, count → prefilled
+  // General Counting, goto → the target screen. Records the camp position so
+  // the run screen can queue up "Next: …" when the drill finishes.
+  function openCampRun(bi, ri) {
+    const run = ((MT.CAMP_BLOCKS[bi] || {}).runs || [])[ri];
+    if (!run) return;
+    MT.unlockAudio();
+    if (run.type === "goto") {
+      if (run.goto === "build-forms") renderFormsBuilder();
+      if (run.goto === "randomizer") renderRandomizer();
+      show(run.goto);
+      return;
+    }
+    if (run.type === "drill") {
+      presetLevel = campLevel; // keep the level seg in sync with the camp page
+      const base = (MT.PRESET_DRILLS.find((d) => d.id === run.preset) || {}).tempo || 1;
+      openPresetConfig(run.preset, {
+        title: run.name,
+        tempo: campDrillTempo(base),
+        reps: run.reps,
+        sets: run.setsPerRound || 1,
+        rounds: run.rounds || 1,
+        rest: run.rest || 0,
+        hold: run.hold || 0,
+        backTo: "camp",
+        campCtx: { bi, ri },
+      });
+    } else if (run.type === "count") {
+      countLevel = campLevel;
+      countInterval = campCountInt(run.interval);
+      renderCountBuilder();
+      $("#count-target").value = run.target;
+      $("#count-sets").value = run.sets;
+      $("#count-rest").value = run.rest || 0;
+      updateCountEst();
+      campRunCtx = { bi, ri };
+      setBackButton("build-count", "camp");
+      show("build-count");
+    }
+  }
+
+  // The run after `ctx` in the same camp block, or null at the block's end —
+  // drills are never chained on one timer; the coach starts each one.
+  function nextCampRun(ctx) {
+    if (!ctx) return null;
+    const runs = (MT.CAMP_BLOCKS[ctx.bi] || {}).runs || [];
+    for (let i = ctx.ri + 1; i < runs.length; i++) {
+      if (runs[i]) return { bi: ctx.bi, ri: i, run: runs[i] };
+    }
+    return null;
+  }
+
+  // Tapping a run opens the matching builder screen, prefilled with the
+  // block's variables — adjust anything (tempo, sound, reps…) there, then
+  // Start. The back arrow returns to the camp page.
+  $("#camp-list").addEventListener("click", (e) => {
+    const row = e.target.closest("[data-camp]");
+    if (!row) return;
+    const parts = row.dataset.camp.split(":").map(Number);
+    openCampRun(parts[0], parts[1]);
+  });
+
   /* -------------------- RUN view -------------------- */
   const PHASE_LABELS = {
     announce: "Next Poomsae",
@@ -839,7 +1042,7 @@
     countdown: "Ready",
     switch: "Switch",
     relax: "Suh",
-    done: "Complete",
+    done: "", // session over — checkmark only, no wording
   };
 
   /* -------- keep the screen awake during a session (Screen Wake Lock) -------- */
@@ -914,6 +1117,7 @@
     setBar(0);
     elCount.textContent = "0";
     elMax.textContent = "";
+    $("#run-next").hidden = true; // only shows once the drill finishes
     // Show the tempo this session runs at (drills & counting).
     $("#run-tempo").textContent = session.tempoLabel || "";
 
@@ -983,9 +1187,11 @@
         } else if (phase === "go") {
           elCount.textContent = "1";
         } else if (phase === "done") {
+          // Session over: just the big checkmark, no wording.
+          elPhase.textContent = "";
           elCount.textContent = "✓";
           elMax.textContent = "";
-          elTitle.textContent = "Well done";
+          elTitle.textContent = "";
         } else if (
           phase === "joonbi" ||
           phase === "sijak" ||
@@ -1024,13 +1230,25 @@
         if (!scrubbing) setBar(p);
       },
       onDone() {
-        elPhase.textContent = "Complete";
-        elTitle.textContent = "Well done";
+        // Session over: just the big checkmark, no wording.
+        elPhase.textContent = "";
+        elTitle.textContent = "";
         elCount.textContent = "✓";
         elMax.textContent = "";
         document.body.dataset.phase = "done";
         stopRunTimer();
         elTimeLeft.textContent = "";
+        // Camp queue: the drill stops here. Show what's next and wait for a
+        // tap — instructors get their time to explain between drills.
+        const next = nextCampRun(session.campNext);
+        if (next) {
+          elTitle.textContent = "Next: " + next.run.name;
+          const nb = $("#run-next");
+          nb.textContent = "Start Next: " + next.run.name + " ›";
+          nb.dataset.bi = next.bi;
+          nb.dataset.ri = next.ri;
+          nb.hidden = false;
+        }
         releaseWakeLock(); // session over — let the screen sleep normally again
       },
     });
@@ -1040,10 +1258,25 @@
     MT.stopSession();
     stopRunTimer();
     releaseWakeLock();
+    $("#run-next").hidden = true;
     document.body.classList.remove("running");
     document.body.dataset.phase = "";
     show(runFromScreen);
   }
+  // Camp queue: open the next drill's config screen (adjust there, then Start).
+  $("#run-next").addEventListener("click", () => {
+    const nb = $("#run-next");
+    const bi = Number(nb.dataset.bi);
+    const ri = Number(nb.dataset.ri);
+    nb.hidden = true;
+    // The finished run is already done — just leave the run screen cleanly.
+    MT.stopSession();
+    stopRunTimer();
+    releaseWakeLock();
+    document.body.classList.remove("running");
+    document.body.dataset.phase = "";
+    openCampRun(bi, ri);
+  });
   function restartRun() {
     if (!currentSession) return;
     MT.stopSession();
@@ -1952,6 +2185,7 @@
     else if (name === "preset-drills") renderPresetList();
     else if (name === "preset-config") updatePresetEst();
     else if (name === "build-pdrill") renderPdrillBuilder();
+    else if (name === "camp") renderCamp();
   }
 
   // Initialize voice choice + tuning on load, and preload recorded name clips.

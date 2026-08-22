@@ -227,6 +227,25 @@ select {
 .pr-name { font-size: 15px; font-weight: 650; line-height: 1.3; }
 .pr-meta { color: var(--gold); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* -------- Team USA camp run of show -------- */
+.camp-time {
+  color: var(--gold); font-size: 12px; font-weight: 800;
+  font-variant-numeric: tabular-nums; min-width: 34px;
+}
+.camp-panel h2 .camp-time { margin-right: 8px; }
+.camp-blocknote { margin: -4px 0 12px; }
+/* Schedule-only rows — no app to run, they just keep the timeline visible. */
+.camp-plain {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 11px 16px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+.camp-plain .camp-title { font-size: 14px; font-weight: 650; }
+.camp-lead { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.camp-note { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; margin-top: 2px; }
+.pr-detail { color: var(--muted); font-size: 12px; line-height: 1.35; }
+
 /* -------- buttons -------- */
 .btn {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
@@ -345,6 +364,15 @@ body.running { background: #000; }
 .run-countmax { color: var(--muted); font-size: clamp(16px, 4vw, 24px); }
 
 .run-bottom { display: flex; flex-direction: column; gap: 16px; }
+/* Camp queue: appears when a drill finishes with another one lined up. */
+.run-next {
+  width: 100%; padding: 16px; font-size: 16px; font-weight: 800; letter-spacing: 0.01em;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #000;
+  border: none; border-radius: 999px; cursor: pointer;
+  box-shadow: 0 8px 28px rgba(231, 177, 10, 0.35);
+  transition: transform 0.12s ease;
+}
+.run-next:active { transform: scale(0.98); }
 /* Estimated time remaining in the whole session. */
 .run-timeleft {
   text-align: center; color: var(--muted); font-size: 13px; font-weight: 600;
