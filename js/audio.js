@@ -152,7 +152,9 @@
         o.type = "sine";
         o.frequency.setValueAtTime(f * h, at);
         const g = ctx.createGain();
-        const peak = (hi === 0 ? 0.9 : hi === 1 ? 0.25 : 0.12) * (i === notes.length - 1 ? 1.1 : 0.9);
+        // Eased down slightly — the chime now rings after every drill, so it
+        // shouldn't blast over a quiet gym between cycles.
+        const peak = (hi === 0 ? 0.68 : hi === 1 ? 0.19 : 0.09) * (i === notes.length - 1 ? 1.1 : 0.9);
         g.gain.setValueAtTime(0.0001, at);
         g.gain.linearRampToValueAtTime(Math.min(1, peak), at + 0.01);
         g.gain.exponentialRampToValueAtTime(0.0001, at + (i === notes.length - 1 ? 2.2 : 1.2));

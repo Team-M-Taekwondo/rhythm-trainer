@@ -62,21 +62,22 @@
   /* -------------------- Preset drills --------------------
      The team's common training drills, variables pre-set. Levels change only
      the tempo: Color +0.1s, Black as listed, Competition Black −0.1s.
-     end: "announce" = final rest + spoken completion (like the custom drill);
-          "chime"    = no rest after the last set, just the finish chime. */
+     Every drill ends the same way: no rest after the last set, just the
+     finish chime — that's how athletes know the cycle is over.
+     kick: true shows the kick-hold option on the config screen. */
   MT.PRESET_LEVELS = [
     { id: "comp", label: "Comp. Black", delta: -0.1 },
     { id: "black", label: "Black Belts", delta: 0 },
     { id: "color", label: "Color Belts", delta: 0.1 },
   ];
   MT.PRESET_DRILLS = [
-    { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, end: "announce" },
-    { id: "round",  group: "Ground drills",   name: "Round House Kicks", tempo: 0.9, reps: 15, rest: 10, sets: 4, end: "announce" },
-    { id: "side",   group: "Ground drills",   name: "Side Kicks",        tempo: 1.1, reps: 15, rest: 10, sets: 4, end: "announce" },
-    { id: "horse",  group: "Standing drills", name: "Horse Stance · Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4, end: "chime" },
-    { id: "inplace", group: "Standing drills", name: "All Stances · In Place · Blocks/Attacks",     tempo: 1.0, reps: 20, rest: 10, sets: 4, end: "chime" },
-    { id: "udblock", group: "Standing drills", name: "All Stances · Up/Down · Blocks",              tempo: 1.5, reps: 20, rest: 10, sets: 4, end: "chime" },
-    { id: "udattack", group: "Standing drills", name: "All Stances · Up/Down · Attacks",            tempo: 1.4, reps: 20, rest: 10, sets: 4, end: "chime" },
+    { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
+    { id: "round",  group: "Ground drills",   name: "Round House Kicks", tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
+    { id: "side",   group: "Ground drills",   name: "Side Kicks",        tempo: 1.1, reps: 15, rest: 10, sets: 4, kick: true },
+    { id: "horse",  group: "Standing drills", name: "Horse Stance · Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "inplace", group: "Standing drills", name: "All Stances · In Place · Blocks/Attacks",     tempo: 1.0, reps: 20, rest: 10, sets: 4 },
+    { id: "udblock", group: "Standing drills", name: "All Stances · Up/Down · Blocks",              tempo: 1.5, reps: 20, rest: 10, sets: 4 },
+    { id: "udattack", group: "Standing drills", name: "All Stances · Up/Down · Attacks",            tempo: 1.4, reps: 20, rest: 10, sets: 4 },
   ];
 
   /* Counting-drill levels. Interval presets are stored at the COMPETITION

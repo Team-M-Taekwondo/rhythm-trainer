@@ -140,6 +140,14 @@
     sel.innerHTML = list.map((v) => `<option value="${v}">${v}${suf}</option>`).join("");
     sel.value = value != null ? value : 1;
   }
+  // Kick-hold picker: 0 (off) to 10 seconds, counted out on the woodblock.
+  function fillHoldSelect(sel, value) {
+    sel.innerHTML = Array.from(
+      { length: 11 },
+      (_, i) => `<option value="${i}">${i === 0 ? "0 s (no hold)" : i + " s"}</option>`
+    ).join("");
+    sel.value = value || 0;
+  }
   /* -------------------- FORMS builder -------------------- */
   let formsSection = "black";
   let formsDivision = "cadet";
@@ -344,6 +352,7 @@
   let drillSound = "woodblock";
   function renderDrillBuilder() {
     fillTempoSelect($("#drill-tempo"), 0.8, "", MT.DRILL_TEMPOS);
+    fillHoldSelect($("#drill-hold"), 0);
     renderDrillSoundChips();
     updateDrillEst();
   }
@@ -357,6 +366,7 @@
           name: "Drill",
           reps: Math.max(1, Number($("#drill-reps").value) || 1),
           duration: Number($("#drill-tempo").value) || 0.8,
+          hold: Number($("#drill-hold").value) || 0,
           sound: drillSound,
         }),
       ],
@@ -367,6 +377,7 @@
   }
   $("#drill-reps").addEventListener("input", updateDrillEst);
   $("#drill-tempo").addEventListener("change", updateDrillEst);
+  $("#drill-hold").addEventListener("change", updateDrillEst);
   $("#drill-sets").addEventListener("input", updateDrillEst);
   $("#drill-rest").addEventListener("input", updateDrillEst);
   function renderDrillSoundChips() {
@@ -390,6 +401,7 @@
       name: "Drill",
       reps: Math.max(1, Number($("#drill-reps").value) || 1),
       duration: tempo,
+      hold: Number($("#drill-hold").value) || 0,
       sound: drillSound,
     };
     startRun({
@@ -438,7 +450,6 @@
       items: [MT.drillToItem({ name: d.name, reps: d.reps, duration: tempo, sound: "woodblock" })],
       sets: d.sets,
       restSeconds: d.rest,
-      endMode: d.end,
     });
   }
   function renderPresetList() {
@@ -492,9 +503,14 @@
     $("#preset-sets").value = d.sets;
     $("#preset-rest").value = d.rest;
     $("#preset-rounds").value = 1;
+    // Kick hold — only makes sense on the kicking (ground) drills.
+    $("#preset-hold-wrap").hidden = !d.kick;
+    fillHoldSelect($("#preset-hold"), 0);
     updatePresetEst();
     show("preset-config");
   }
+  const presetHold = () =>
+    presetDrill && presetDrill.kick ? Number($("#preset-hold").value) || 0 : 0;
   function updatePresetEst() {
     const el = $("#preset-est");
     if (!el || !presetDrill) return;
@@ -507,16 +523,17 @@
           name: presetDrill.name,
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: Number($("#preset-tempo").value) || levelTempo(presetDrill.tempo),
+          hold: presetHold(),
           sound: presetSound,
         }),
       ],
       sets: setsPerRound * rounds,
       restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
-      endMode: presetDrill.end,
     });
     el.textContent = "Est. total: ~" + MT.fmtTime(t);
   }
   $("#preset-tempo").addEventListener("change", updatePresetEst);
+  $("#preset-hold").addEventListener("change", updatePresetEst);
   $("#preset-reps").addEventListener("input", updatePresetEst);
   $("#preset-sets").addEventListener("input", updatePresetEst);
   $("#preset-rest").addEventListener("input", updatePresetEst);
@@ -542,6 +559,7 @@
           name: presetDrill.name,
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: tempo,
+          hold: presetHold(),
           sound: presetSound,
         }),
       ],
@@ -549,7 +567,6 @@
       setsPerRound,
       rounds,
       restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
-      endMode: presetDrill.end,
       tempoLabel: tempo.toFixed(1) + "s / rep",
     });
   });
@@ -987,6 +1004,13 @@
       onTension(k, N, formN) {
         document.body.dataset.phase = "tension";
         elPhase.textContent = `SLOW · ${N}s`;
+        elCount.textContent = k;
+        elMax.textContent = `hold ${k} / ${N}`;
+      },
+      // Kick hold — woodblock counts each held second, big number shows it.
+      onHold(k, N) {
+        document.body.dataset.phase = "tension";
+        elPhase.textContent = `HOLD · ${N}s`;
         elCount.textContent = k;
         elMax.textContent = `hold ${k} / ${N}`;
       },

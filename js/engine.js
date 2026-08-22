@@ -83,7 +83,14 @@
           acc += Math.max(0, (c.duration || N) - N);
         } else {
           events.push({ rt: acc, kind: "beat", n: c.n, accent: c.accent, mark: c.mark, cd: c.cd });
-          acc += Math.max(0.1, c.duration);
+          // Kick hold: woodblock ticks count each held second after the kick,
+          // the last one accented as the release cue. Part of the rep's time —
+          // the next rep's tempo interval starts after the hold lets go.
+          const hold = c.hold > 0 ? Math.round(Math.min(10, c.hold)) : 0;
+          for (let k = 1; k <= hold; k++) {
+            events.push({ rt: acc + k, kind: "hold", n: c.n, k: k, N: hold });
+          }
+          acc += hold + Math.max(0.1, c.duration);
         }
       });
       const total = acc; // full metronome duration in seconds
@@ -118,12 +125,23 @@
           const at = startT + e.rt;
           if (e.kind === "beat" && e.mark) {
             MT.playMilestone(at, metroBus); // every-10th-rep marker
+          } else if (e.kind === "hold") {
+            MT.playSound("woodblock", at, e.k === e.N, metroBus); // last tick = release
           } else {
             MT.playSound(soundId, at, e.kind === "beat" ? e.accent : e.k === 1, metroBus);
           }
           if (settings && settings.voice && e.kind === "tension") {
             const id = setTimeout(() => {
               if (!player.cancelled) MT.speak(MT.KO_NUMBERS_8[e.k - 1], { rate: 1.0 });
+            }, Math.max(0, (at - MT.now()) * 1000));
+            speechTimers.push(id);
+            player.timers.push(id);
+          }
+          // Kick hold: count the held seconds out loud in Korean (하나…열),
+          // matching however long the hold is set for, over the woodblock.
+          if (settings && settings.voice && e.kind === "hold") {
+            const id = setTimeout(() => {
+              if (!player.cancelled) MT.speak(MT.KO_NUMBERS_10[e.k - 1], { rate: 1.0 });
             }, Math.max(0, (at - MT.now()) * 1000));
             speechTimers.push(id);
             player.timers.push(id);
@@ -156,7 +174,9 @@
           idx = cur;
           const e = events[cur];
           if (e.kind === "tension") cb.onTension(e.k, e.N, e.n);
-          else cb.onCount(e.n, counts.length);
+          else if (e.kind === "hold") {
+            if (cb.onHold) cb.onHold(e.k, e.N, e.n);
+          } else cb.onCount(e.n, counts.length);
         }
         cb.onProgress(Math.min(1, Math.max(0, rt / total)));
         if (rt >= total) return finish();
@@ -310,15 +330,6 @@
       await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
     }
   }
-  // Rest countdown with no trailing "Sijak" — used after the final set.
-  async function drillFinalRest(seconds, player, cb, settings) {
-    for (let r = seconds; r > 0; r--) {
-      if (stopped(player)) return;
-      cb.onPhase("rest", "Rest", r);
-      sayCountdown(r, settings);
-      await wait(1, player);
-    }
-  }
   async function runDrill(session, player, cb, settings) {
     const drill = session.items[0];
     // The drill has no spoken cue to revive the audio clock, so make sure it's
@@ -339,19 +350,11 @@
       if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings);
     }
     if (player.cancelled) return;
-    if (session.endMode === "chime") {
-      // Standing drills: no rest after the final set — the finish chime rings
-      // right away so it's obvious the drill is over.
-      cb.onPhase("done", "Complete");
-      MT.playFinishChime();
-      await wait(2.4, player); // let the bell ring out before onDone
-      return;
-    }
-    // Default (ground/custom): run the selected rest time, then announce completion.
-    if (session.restSeconds > 0) await drillFinalRest(session.restSeconds, player, cb, settings);
-    if (player.cancelled) return;
+    // Every drill ends the same way: no rest countdown after the final set —
+    // the finish chime rings right away so athletes know the cycle is over.
     cb.onPhase("done", "Complete");
-    await say("The drill has completed", player, settings, { lang: "en-US", absolute: true, rate: 0.95, pitch: 1.0 });
+    MT.playFinishChime();
+    await wait(2.4, player); // let the bell ring out before onDone
   }
 
   /* ---- Counting drill: spoken Korean counting for instructor-called drills.
@@ -484,8 +487,12 @@
     }
     if (player.cancelled) return;
     cb.onPhase("done", "Complete");
-    MT.playFinishChime();
-    await wait(2.4, player);
+    // The chime marks the end of a cycle — a single poomsae run once doesn't
+    // need the signal, so it ends quietly after Baro.
+    if (totalItems > 1 || session.reps > 1) {
+      MT.playFinishChime();
+      await wait(2.4, player);
+    }
   }
 
   // Switch time between Mixed rounds — spoken countdown the last 5s.
@@ -542,6 +549,13 @@
       if (r < session.rounds - 1) {
         await switchTimer(session.switchSeconds, labelOf(order[(r + 1) % order.length]), player, cb, settings);
       }
+    }
+    if (player.cancelled) return;
+    // End-of-cycle chime — only when there was a cycle to finish.
+    if (session.rounds > 1) {
+      cb.onPhase("done", "Complete");
+      MT.playFinishChime();
+      await wait(2.4, player);
     }
   }
 
@@ -604,6 +618,14 @@
         }
       }
       if (player.cancelled) break;
+    }
+
+    // End-of-cycle chime — more than one poomsae (or set) gets the bell so
+    // athletes know the whole session is over; a single run ends quietly.
+    if (!player.cancelled && session.sets * totalItems > 1) {
+      cb.onPhase("done", "Complete");
+      MT.playFinishChime();
+      await wait(2.4, player);
     }
 
     const wasCancelled = player.cancelled;
@@ -708,6 +730,8 @@
       counts.push({
         n,
         duration: drill.duration,
+        // Kick hold in seconds — woodblock ticks count it out after each kick.
+        hold: drill.hold || 0,
         accent: false,
         // Mark the LAST rep so the milestone triple-beep fires at the end of the set.
         mark: n === drill.reps,
@@ -779,7 +803,7 @@
       if (c.tension === 5 || c.tension === 8) {
         acc += c.tension + Math.max(0, (c.duration || c.tension) - c.tension);
       } else {
-        acc += Math.max(0.1, c.duration);
+        acc += (c.hold > 0 ? Math.round(Math.min(10, c.hold)) : 0) + Math.max(0.1, c.duration);
       }
     });
     return acc;
@@ -817,7 +841,7 @@
   };
 
   // Drill sessions break into: countdown intro, each set (lead-in + reps),
-  // rest + Sijak between sets, and the ending (chime tail or rest + phrase).
+  // rest + Sijak between sets, and the finish-chime tail.
   function drillParts(session, settings) {
     const item = session.items[0];
     const sijak = cueLen(MT.CUES.sijak.say, 0.9, settings);
@@ -825,10 +849,7 @@
       intro: 3 + sijak,
       set: (item.counts.length ? item.counts[0].duration : 0) + MT.countsDuration(item.counts),
       between: session.restSeconds + sijak,
-      tail:
-        session.endMode === "chime"
-          ? 2.4
-          : session.restSeconds + cueLen("The drill has completed", 1.8, settings),
+      tail: 2.4,
     };
   }
   function countParts(session, settings) {
@@ -887,7 +908,7 @@
         t += cueLen(it.spoken || it.name, 1.5, settings) + GAP + session.reps * (cyc + pdrillHeard(it));
       });
       const totalReps = session.reps * session.items.length;
-      return t + Math.max(0, totalReps - 1) * (session.restSeconds + 3) + 2.4;
+      return t + Math.max(0, totalReps - 1) * (session.restSeconds + 3) + (totalReps > 1 ? 2.4 : 0);
     }
     if (session.kind === "mixed") {
       const forms = MT.loadForms();
@@ -895,12 +916,12 @@
       if (!order.length) return 0;
       let t = 0;
       for (let r = 0; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings);
-      return t + Math.max(0, session.rounds - 1) * session.switchSeconds;
+      return t + Math.max(0, session.rounds - 1) * session.switchSeconds + (session.rounds > 1 ? 2.4 : 0);
     }
     let per = 0;
     session.items.forEach((it) => (per += MT.estimatePoomsaeItem(it, settings)));
     const n = session.sets * session.items.length;
-    return per * session.sets + Math.max(0, n - 1) * session.restSeconds;
+    return per * session.sets + Math.max(0, n - 1) * session.restSeconds + (n > 1 ? 2.4 : 0);
   };
 
   // Estimated seconds from the START of the item onItem just announced to the
@@ -925,7 +946,8 @@
         t += cueLen(items[i].spoken || items[i].name, 1.5, settings) + GAP + session.reps * (cyc + pdrillHeard(items[i]));
         repsLeft += session.reps;
       }
-      return t + Math.max(0, repsLeft - 1) * (session.restSeconds + 3) + 2.4;
+      const chime = session.reps * items.length > 1 ? 2.4 : 0;
+      return t + Math.max(0, repsLeft - 1) * (session.restSeconds + 3) + chime;
     }
     if (session.kind === "mixed") {
       const forms = MT.loadForms();
@@ -940,7 +962,7 @@
         );
       }
       for (let r = info.set; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings);
-      return t + (session.rounds - info.set) * session.switchSeconds;
+      return t + (session.rounds - info.set) * session.switchSeconds + (session.rounds > 1 ? 2.4 : 0);
     }
     const items = session.items;
     const n = session.sets * items.length;
@@ -950,6 +972,6 @@
     for (let s = info.set; s < session.sets; s++) {
       items.forEach((it) => (t += MT.estimatePoomsaeItem(it, settings)));
     }
-    return t + Math.max(0, n - 1 - pos) * session.restSeconds;
+    return t + Math.max(0, n - 1 - pos) * session.restSeconds + (n > 1 ? 2.4 : 0);
   };
 })();
