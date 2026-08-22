@@ -118,6 +118,17 @@
       if (dest === "preset-drills") renderPresetList();
       if (dest === "build-count") renderCountBuilder();
       if (dest === "randomizer") renderRandomizer();
+      if (dest === "build-pdrill") {
+        // The list depends on decoded audio — this tap is a user gesture, so
+        // unlock, decode anything pending (iOS), then render with real data.
+        MT.unlockAudio();
+        renderPdrillBuilder();
+        if (MT.decodePendingClips) {
+          Promise.resolve(MT.decodePendingClips()).then(() => {
+            if ($(".screen[data-screen='build-pdrill']").classList.contains("active")) renderPdrillBuilder();
+          });
+        }
+      }
       show(dest);
     }
   });
@@ -624,6 +635,107 @@
     });
   });
 
+  /* -------------------- POOMSAE DRILLS: INTRO -------------------- */
+  let pdrillSection = "black";
+  let pdrillDivision = "cadet";
+  const pdrillDiv = () => (pdrillSection === "black" ? pdrillDivision : "");
+
+  function renderPdrillBuilder() {
+    $$("#pdrill-section .seg-btn").forEach((b) =>
+      b.classList.toggle("active", b.dataset.section === pdrillSection)
+    );
+    $("#pdrill-division-wrap").hidden = pdrillSection !== "black";
+    $("#pdrill-division").innerHTML = MT.CLIP_DIVISIONS.map((id) => {
+      const d = MT.DIVISIONS.find((x) => x.id === id) || { id, label: id };
+      return `<option value="${d.id}">${d.label}</option>`;
+    }).join("");
+    $("#pdrill-division").value = pdrillDivision;
+
+    // Only poomsae whose recording has a drill end marked (and audio decoded).
+    const division = pdrillDiv();
+    const list = sectionForms(pdrillSection, pdrillDivision).filter(
+      (f) => MT.introDuration(pdrillSection, division, f.id) > 0
+    );
+    $("#pdrill-checklist").innerHTML = list.length
+      ? list
+          .map(
+            (f) => `
+      <label class="check-item">
+        <input type="checkbox" value="${f.id}" />
+        <span class="ci-name">${f.id}. ${f.name}</span>
+        <span class="ci-meta">~${MT.fmtTime(MT.introDuration(pdrillSection, division, f.id))} intro</span>
+      </label>`
+          )
+          .join("")
+      : `<p class="hint">No intro points set up for this selection yet.</p>`;
+    updatePdrillEst();
+  }
+
+  function updatePdrillEst() {
+    const el = $("#pdrill-est");
+    if (!el) return;
+    const ids = $$("#pdrill-checklist input:checked").map((c) => Number(c.value));
+    if (!ids.length) {
+      el.textContent = "Pick poomsae to see a total time.";
+      return;
+    }
+    const all = MT.loadForms();
+    const items = ids.map((id) => {
+      const f = all.find((x) => x.id === id);
+      return { id: f.id, name: f.name, spoken: f.spoken, section: pdrillSection, division: pdrillDiv() };
+    });
+    const t = MT.estimateSession({
+      kind: "pdrill",
+      items,
+      reps: Math.max(1, Number($("#pdrill-reps").value) || 1),
+      restSeconds: Math.max(0, Number($("#pdrill-rest").value) || 0),
+    });
+    el.textContent = "Est. total: ~" + MT.fmtTime(t);
+  }
+
+  $$("#pdrill-section .seg-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      pdrillSection = btn.dataset.section;
+      renderPdrillBuilder();
+    })
+  );
+  $("#pdrill-division").addEventListener("change", (e) => {
+    pdrillDivision = e.target.value;
+    renderPdrillBuilder();
+  });
+  $("#pdrill-checklist").addEventListener("change", updatePdrillEst);
+  $("#pdrill-reps").addEventListener("input", updatePdrillEst);
+  $("#pdrill-rest").addEventListener("input", updatePdrillEst);
+
+  $("#start-pdrill").addEventListener("click", () => {
+    MT.unlockAudio();
+    const ids = $$("#pdrill-checklist input:checked").map((c) => Number(c.value));
+    if (!ids.length) return alert("Pick at least one poomsae.");
+    const all = MT.loadForms();
+    const items = ids.map((id) => {
+      const f = all.find((x) => x.id === id);
+      return {
+        type: "form",
+        id: f.id,
+        name: f.name,
+        spoken: f.spoken || f.name,
+        sound: f.sound,
+        counts: f.counts,
+        announce: true,
+        section: pdrillSection,
+        division: pdrillDiv(),
+        intro: true, // playClip cuts the audio at the marked drill end
+      };
+    });
+    startRun({
+      kind: "pdrill",
+      items,
+      reps: Math.max(1, Number($("#pdrill-reps").value) || 1),
+      restSeconds: Math.max(0, Number($("#pdrill-rest").value) || 0),
+      tempoLabel: "Poomsae Intro",
+    });
+  });
+
   /* -------------------- POOMSAE RANDOMIZER -------------------- */
   let rzSection = "black";
   let rzDivision = "youth";
@@ -807,7 +919,9 @@
         estAnchor = MT.now();
         // Preset drills run rounds × sets; show both when rounds are in play.
         const spr = session.setsPerRound;
-        if (spr && session.rounds > 1) {
+        if (session.kind === "pdrill") {
+          elSet.textContent = `Rep ${info.set} / ${info.sets}`;
+        } else if (spr && session.rounds > 1) {
           const round = Math.ceil(info.set / spr);
           const setIn = ((info.set - 1) % spr) + 1;
           elSet.textContent = `Round ${round}/${session.rounds} · Set ${setIn}/${spr}`;
@@ -1039,6 +1153,7 @@
     stopClipPreview();
     updateSpeedUI();
     loadZoneDraft();
+    loadIntroUI();
   }
   $("#clip-file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
@@ -1393,6 +1508,82 @@
     loadZoneDraft();
   });
 
+  /* ---- Poomsae Intro drill end: one point per RECORDING (like the count
+     sections), so marking it on the sample covers every division on a speed
+     match — they all stop at the same movement. Set it from the zone-panel
+     playhead or type it, save, and it rides the same Export zip. ---- */
+  let introPreviewSrc = null;
+  function stopIntroPreview() {
+    if (introPreviewSrc) {
+      try {
+        introPreviewSrc.stop();
+      } catch (e) {}
+    }
+    introPreviewSrc = null;
+    $("#intro-preview").textContent = "Preview intro";
+  }
+  function loadIntroUI() {
+    stopIntroPreview();
+    const panel = $("#intro-panel");
+    const zc = zoneClip();
+    panel.hidden = !zc;
+    if (panel.hidden) return;
+    const key = MT.clipKey(zc.section, zc.division, zc.id);
+    const local = Number((MT.getClipMeta(key) || {}).intro) || 0;
+    const repo = MT.repoIntroEnd ? MT.repoIntroEnd(zc.section, zc.division, zc.id) : 0;
+    $("#intro-end").value = local || repo || "";
+    $("#intro-clear").disabled = !local;
+    $("#intro-status").textContent = local
+      ? "✓ Saved on this device: the drill stops " + local.toFixed(1) + "s into " + zoneRecordingName() + "."
+      : repo
+        ? "Published: the drill stops " + repo.toFixed(1) + "s into " + zoneRecordingName() + "."
+        : "No drill end yet — this poomsae won't appear in the Poomsae Intro drill.";
+  }
+  $("#intro-mark").addEventListener("click", () => {
+    const h = zoneHead();
+    if (h == null) {
+      $("#intro-status").textContent = "Tap “Play recording” (in Count sections) first, then set from the playhead.";
+      return;
+    }
+    $("#intro-end").value = h.toFixed(1);
+  });
+  // Preview exactly what the selected belt/division hears: their speed match,
+  // count sections held back, cut at the drill end in the field (even unsaved).
+  $("#intro-preview").addEventListener("click", () => {
+    if (introPreviewSrc) return stopIntroPreview();
+    if (!editorForm) return;
+    const clip = MT.resolveClip(editorSection, editorDiv(), editorForm.id);
+    const end = Number($("#intro-end").value);
+    if (!clip || !(end > 0)) return;
+    MT.unlockAudio();
+    stopClipPreview();
+    stopSpeedPreview();
+    stopZonePlay();
+    const plan = MT.clipPlan(clip.section, clip.division, clip.id, clip.rate || 1, undefined, end);
+    const h = MT.playPlanAt(clip.section, clip.division, clip.id, null, plan, 0, stopIntroPreview);
+    if (h) {
+      introPreviewSrc = h;
+      $("#intro-preview").textContent = "Stop";
+    }
+  });
+  $("#intro-save").addEventListener("click", () => {
+    const zc = zoneClip();
+    if (!zc) return;
+    const v = Number($("#intro-end").value);
+    const dur = zoneDur();
+    MT.setClipMeta(MT.clipKey(zc.section, zc.division, zc.id), {
+      intro: v > 0 ? Math.round(Math.min(v, dur || v) * 100) / 100 : null,
+    });
+    loadIntroUI();
+    flash("#intro-save", "Saved ✓");
+  });
+  $("#intro-clear").addEventListener("click", () => {
+    const zc = zoneClip();
+    if (!zc) return;
+    MT.setClipMeta(MT.clipKey(zc.section, zc.division, zc.id), { intro: null });
+    loadIntroUI();
+  });
+
   function playSoundSample(soundId) {
     MT.unlockAudio();
     const t = MT.now() + 0.05;
@@ -1575,30 +1766,49 @@
           a.division.localeCompare(b.division) ||
           a.poomsae - b.poomsae
       );
+    // Poomsae Intro drill ends, keyed by recording — same merge rule again.
+    const introMap = new Map(MT.getRepoIntros ? MT.getRepoIntros() : []);
+    Object.keys(metaAll).forEach((k) => {
+      const v = Number(metaAll[k] && metaAll[k].intro);
+      if (v > 0) introMap.set(k, v);
+    });
+    const intros = Array.from(introMap.entries())
+      .map(([k, end]) => {
+        const [section, division, idStr] = k.split("|");
+        return { section, division, poomsae: Number(idStr), end: Math.round(end * 100) / 100 };
+      })
+      .filter((z) => z.poomsae > 0 && z.end > 0)
+      .sort(
+        (a, b) =>
+          a.section.localeCompare(b.section) ||
+          a.division.localeCompare(b.division) ||
+          a.poomsae - b.poomsae
+      );
     files.push({
       name: "data/tempomap.json",
-      data: new TextEncoder().encode(JSON.stringify({ matches, zones }, null, 2) + "\n"),
+      data: new TextEncoder().encode(JSON.stringify({ matches, zones, intros }, null, 2) + "\n"),
     });
     return {
       blob: makeZip(files),
       count: clips.length,
       matchCount: matches.length,
       zoneCount: zones.length,
+      introCount: intros.length,
       manifest,
     };
   }
   async function exportForGitHub() {
     $("#export-status").textContent = "Packaging…";
     try {
-      const { blob, count, matchCount, zoneCount } = await buildExportZip();
-      if (!count && !matchCount && !zoneCount) {
-        $("#export-status").textContent = "Nothing to export yet — no clips, speed matches or count sections.";
+      const { blob, count, matchCount, zoneCount, introCount } = await buildExportZip();
+      if (!count && !matchCount && !zoneCount && !introCount) {
+        $("#export-status").textContent = "Nothing to export yet — no clips, speed matches, count sections or drill ends.";
         return;
       }
       downloadBlob(blob, "mteam-rhythm-data.zip");
       $("#export-status").textContent =
         "Exported " + count + " clip(s) + " + matchCount + " speed match(es) + " +
-        zoneCount + " poomsae with count sections → mteam-rhythm-data.zip. " +
+        zoneCount + " poomsae with count sections + " + introCount + " drill end(s) → mteam-rhythm-data.zip. " +
         "Unzip into the project folder, then push.";
     } catch (e) {
       $("#export-status").textContent = "Export failed: " + e.message;
@@ -1696,6 +1906,7 @@
     else if (name === "build-count") updateCountEst();
     else if (name === "preset-drills") renderPresetList();
     else if (name === "preset-config") updatePresetEst();
+    else if (name === "build-pdrill") renderPdrillBuilder();
   }
 
   // Initialize voice choice + tuning on load, and preload recorded name clips.

@@ -10,11 +10,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=86" />
+  <link rel="stylesheet" href="css/styles.css?v=87" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=86" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=86" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=87" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=87" />
 </head>
 <body>
   <div id="app">
@@ -156,7 +156,68 @@
           <span class="card-title">General Counting</span>
           <span class="card-sub">The app counts out loud while the coach calls the drill</span>
         </button>
+        <button class="card big" data-goto="poomsae-drills">
+          <span class="card-kicker">Option 4</span>
+          <span class="card-title">Poomsae Drills</span>
+          <span class="card-sub">Sections of a poomsae on repeat, at each division's tempo</span>
+        </button>
       </div>
+    </section>
+
+    <!-- ================= POOMSAE DRILLS HUB ================= -->
+    <section class="screen" data-screen="poomsae-drills">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="drills">&larr;</button>
+        <h1>Poomsae Drills</h1>
+      </div>
+      <div class="home-grid">
+        <button class="card big" data-goto="build-pdrill">
+          <span class="card-kicker">Option 1</span>
+          <span class="card-title">Poomsae Intro</span>
+          <span class="card-sub">The opening of a poomsae on repeat &mdash; Joonbi &rarr; Sijak &rarr; stop &rarr; Baro</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================= POOMSAE DRILLS: INTRO ================= -->
+    <section class="screen" data-screen="build-pdrill">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="poomsae-drills">&larr;</button>
+        <h1>Poomsae Intro</h1>
+      </div>
+
+      <div class="panel">
+        <h2>Belt</h2>
+        <div class="seg" id="pdrill-section">
+          <button class="seg-btn active" data-section="black">Black Belt</button>
+          <button class="seg-btn" data-section="color">Color Belt</button>
+        </div>
+        <label class="field" id="pdrill-division-wrap">
+          <span>Division</span>
+          <select id="pdrill-division"></select>
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>1 &middot; Choose poomsae</h2>
+        <p class="hint">Each rep plays the poomsae's opening at this division's tempo, then stops &mdash; Joonbi &rarr; Sijak &rarr; intro &rarr; Baro &rarr; rest &rarr; 3-2-1. Only poomsae with a drill end set up appear here.</p>
+        <div id="pdrill-checklist" class="checklist"></div>
+      </div>
+
+      <div class="panel">
+        <h2>2 &middot; Reps &amp; rest</h2>
+        <label class="field">
+          <span>Reps per poomsae</span>
+          <input type="number" id="pdrill-reps" min="1" max="20" value="3" />
+        </label>
+        <label class="field">
+          <span>Rest between reps (seconds)</span>
+          <input type="number" id="pdrill-rest" min="0" max="120" value="10" />
+        </label>
+      </div>
+
+      <p class="est-line" id="pdrill-est"></p>
+      <button class="start-btn" id="start-pdrill">Start Drill</button>
     </section>
 
     <!-- ================= PRESET DRILLS: LIST ================= -->
@@ -435,6 +496,24 @@
         </div>
       </div>
 
+      <div class="panel" id="intro-panel" hidden>
+        <h2>Poomsae Intro (drill end)</h2>
+        <p class="hint">Where the <b>Poomsae Intro</b> drill stops. The time is a position <b>in the recording</b>, so one point covers every division on this file &mdash; they all stop at the same movement, their speed match just shifts when it's heard. Use <b>Play recording</b> in Count sections above, then set it from the playhead (or type it).</p>
+        <p class="hint" id="intro-status"></p>
+        <label class="field">
+          <span>Drill ends at (seconds into the recording)</span>
+          <input type="number" id="intro-end" inputmode="decimal" step="0.1" min="0" />
+        </label>
+        <div class="vp-buttons">
+          <button class="btn ghost" id="intro-mark">Set from playhead</button>
+          <button class="btn ghost" id="intro-preview">Preview intro</button>
+        </div>
+        <div class="vp-buttons">
+          <button class="btn" id="intro-save">Save drill end</button>
+          <button class="btn ghost" id="intro-clear" disabled>Clear</button>
+        </div>
+      </div>
+
       <button class="test-btn" id="editor-test">&#9654; Test tempo</button>
       <div class="editor-actions">
         <button class="start-btn" id="editor-save">Save</button>
@@ -482,9 +561,9 @@
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=86"></script>
-  <script src="js/audio.js?v=86"></script>
-  <script src="js/engine.js?v=86"></script>
-  <script src="js/app.js?v=86"></script>
+  <script src="js/data.js?v=87"></script>
+  <script src="js/audio.js?v=87"></script>
+  <script src="js/engine.js?v=87"></script>
+  <script src="js/app.js?v=87"></script>
 </body>
 </html>

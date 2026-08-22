@@ -682,6 +682,13 @@
         const division = z.section ? z.division || "" : "u30";
         REPO_ZONES.set(clipKey(section, division, id), z.ranges);
       });
+      // Poomsae Intro drill ends — also positions in a recording, so one
+      // marked point covers every division on that recording.
+      ((m && m.intros) || []).forEach((z) => {
+        const id = Number(z.poomsae);
+        const end = Number(z.end);
+        if (id > 0 && end > 0) REPO_INTROS.set(clipKey(z.section, z.division || "", id), end);
+      });
     } catch (e) {}
   };
   MT.repoTempoSpeed = function (key) {
@@ -783,15 +790,52 @@
     return Array.from(REPO_ZONES.entries());
   };
 
+  /* -------------------- Poomsae Intro drill end --------------------
+     Where the "Poomsae Intro" drill stops, in the RECORDING's own seconds —
+     stored per recording (like count sections), so marking it once on the
+     sample covers every division on a speed match automatically: they all
+     stop at the same movement, their rate just shifts when it's heard.
+     Admin edits live in clip meta ("intro"); published ends ship in
+     data/tempomap.json. A local edit wins over the published one. */
+  const REPO_INTROS = new Map(); // clipKey -> end (buffer seconds)
+
+  MT.repoIntroEnd = function (section, division, id) {
+    return REPO_INTROS.get(clipKey(section, division, id)) || 0;
+  };
+  MT.getRepoIntros = function () {
+    return Array.from(REPO_INTROS.entries());
+  };
+  // The drill end for a recording, local-first, clamped to the clip length.
+  MT.getIntroEnd = function (section, division, id) {
+    const key = clipKey(section, division, id);
+    const meta = (MT.getClipMeta ? MT.getClipMeta(key) : null) || {};
+    const local = Number(meta.intro);
+    const end = local > 0 ? local : REPO_INTROS.get(key) || 0;
+    if (!(end > 0)) return 0;
+    const dur = MT.clipDuration(section, division, id);
+    return dur ? Math.min(end, dur) : end;
+  };
+  // Heard length of the intro for what (section, division) actually plays —
+  // 0 when there's no clip or no drill end marked (the drill hides those).
+  MT.introDuration = function (section, division, id) {
+    const clip = MT.resolveClip(section, division, id);
+    if (!clip) return 0;
+    const end = MT.getIntroEnd(clip.section, clip.division, clip.id);
+    if (!(end > 0)) return 0;
+    return MT.clipPlan(clip.section, clip.division, clip.id, clip.rate || 1, undefined, end).duration;
+  };
+
   /* A playback plan: the recording sliced into segments, each with its own
      rate. Everything runs at the match speed except the count sections, which
      run at 1×. Times: b0/b1 are BUFFER seconds, h0/h1 are HEARD seconds.
      No zones (or a 1× match) collapses to a single plain segment, i.e. exactly
      what the app did before. `zonesOverride` lets the editor plan against
-     ranges it hasn't saved yet. */
-  MT.clipPlan = function (section, division, id, rate, zonesOverride) {
-    const dur = MT.clipDuration(section, division, id);
+     ranges it hasn't saved yet. `endBuffer` cuts the plan at that point in the
+     recording (buffer seconds) — used by the Poomsae Intro drill. */
+  MT.clipPlan = function (section, division, id, rate, zonesOverride, endBuffer) {
+    let dur = MT.clipDuration(section, division, id);
     if (!dur) return { segments: [], duration: 0, zoned: false };
+    if (endBuffer > 0) dur = Math.min(dur, endBuffer);
     rate = rate > 0 ? rate : 1;
     // Zones belong to whichever recording is actually playing. At 1× there's
     // nothing to hold back, so they're irrelevant.

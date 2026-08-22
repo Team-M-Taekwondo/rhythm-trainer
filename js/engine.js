@@ -215,10 +215,13 @@
         : { section: item.section, division: item.division, id: item.id, rate: 1 };
       if (!clip) return resolve();
       const rate = clip.rate || 1;
+      // Poomsae Intro drill: cut the plan at the marked drill end (a position
+      // in the recording, so every division stops at the same movement).
+      const introEnd = item.intro && MT.getIntroEnd ? MT.getIntroEnd(clip.section, clip.division, clip.id) : 0;
       // Segment plan: the recording at the match speed, except the count
       // sections baked into the audio, which stay at the sample's own speed.
       const plan = MT.clipPlan
-        ? MT.clipPlan(clip.section, clip.division, clip.id, rate)
+        ? MT.clipPlan(clip.section, clip.division, clip.id, rate, undefined, introEnd)
         : { segments: [], duration: MT.clipDuration(clip.section, clip.division, clip.id) / rate };
       // Heard duration — shorter than the recording wherever the match speeds it up.
       const dur = plan.duration;
@@ -421,6 +424,70 @@
     await say(MT.CUES.swieo.say, player, settings, STYLE.swieo);
   }
 
+  /* ---- Poomsae Intro drill: each selected poomsae's opening section on
+     repeat, at the division's tempo. Per rep: Joonbi → Sijak → clip up to the
+     marked drill end → Baro → rest (silent) → 3-2-1 in Korean → next rep.
+     The name is announced once per poomsae; ends with the finish chime. ---- */
+  async function runPoomsaeDrill(session, player, cb, settings) {
+    const totalItems = session.items.length;
+    for (let it = 0; it < totalItems; it++) {
+      const item = session.items[it];
+      for (let r = 0; r < session.reps; r++) {
+        if (player.cancelled) return;
+        player.skip = false; // a Skip advances to the next rep
+        cb.onItem({
+          set: r + 1,
+          sets: session.reps,
+          item: it + 1,
+          items: totalItems,
+          name: item.name,
+          id: item.id,
+          section: item.section,
+          division: item.division,
+        });
+        if (r === 0) {
+          cb.onPhase("announce", item.name, item.id);
+          await sayName(item, player, settings);
+          await wait(GAP, player);
+        }
+        if (player.cancelled) return;
+        cb.onPhase("joonbi", "Joonbi");
+        await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+        if (player.cancelled) return;
+        await wait(0.5, player); // brief beat before the start call
+        cb.onPhase("sijak", "Sijak");
+        await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
+        if (player.cancelled) return;
+        cb.onPhase("go", item.name);
+        await playClip(item, player, cb); // item.intro cuts it at the drill end
+        if (player.cancelled) return;
+        cb.onPhase("baro", "Baro");
+        await say(MT.CUES.baro.say, player, settings, STYLE.baro);
+        if (player.cancelled) return;
+        const isLast = it === totalItems - 1 && r === session.reps - 1;
+        if (!isLast) {
+          // Silent rest, then a distinct 3-2-1 leading into the next Joonbi.
+          for (let s = session.restSeconds; s > 0; s--) {
+            if (stopped(player)) break;
+            cb.onPhase("rest", "Rest", s);
+            await wait(1, player);
+          }
+          if (player.cancelled) return;
+          for (let n = 3; n >= 1; n--) {
+            if (stopped(player)) break;
+            cb.onPhase("countdown", "", n);
+            sayCountdown(n, settings);
+            await wait(1, player);
+          }
+        }
+      }
+    }
+    if (player.cancelled) return;
+    cb.onPhase("done", "Complete");
+    MT.playFinishChime();
+    await wait(2.4, player);
+  }
+
   // Switch time between Mixed rounds — spoken countdown the last 5s.
   async function switchTimer(seconds, nextLabel, player, cb, settings) {
     for (let r = seconds; r > 0; r--) {
@@ -489,9 +556,10 @@
     MT._current = player;
     MT.unlockAudio();
 
-    if (session.kind === "drill" || session.kind === "mixed" || session.kind === "count") {
+    if (session.kind === "drill" || session.kind === "mixed" || session.kind === "count" || session.kind === "pdrill") {
       if (session.kind === "drill") await runDrill(session, player, cb, settings);
       else if (session.kind === "count") await runCounting(session, player, cb, settings);
+      else if (session.kind === "pdrill") await runPoomsaeDrill(session, player, cb, settings);
       else await runMixed(session, player, cb, settings);
       const wc = player.cancelled;
       try {
@@ -773,6 +841,19 @@
     };
   }
 
+  // Poomsae Intro drill: fixed cue overhead of one rep (Joonbi → Sijak →
+  // …intro… → Baro) and the heard length of one poomsae's intro.
+  function pdrillCycle(settings) {
+    return (
+      cueLen(MT.CUES.joonbi.say, 0.9, settings) + 0.5 +
+      cueLen(MT.CUES.sijak.say, 0.9, settings) +
+      cueLen(MT.CUES.baro.say, 0.9, settings)
+    );
+  }
+  function pdrillHeard(item) {
+    return MT.introDuration ? MT.introDuration(item.section, item.division, item.id) : 0;
+  }
+
   // Average poomsae length for one Mixed round of `div` — the draw is random,
   // so the mean over that division's pool is the honest estimate.
   function mixedRoundAvg(div, forms, settings) {
@@ -799,6 +880,15 @@
       const p = session.kind === "drill" ? drillParts(session, settings) : countParts(session, settings);
       return p.intro + session.sets * p.set + (session.sets - 1) * p.between + p.tail;
     }
+    if (session.kind === "pdrill") {
+      const cyc = pdrillCycle(settings);
+      let t = 0;
+      session.items.forEach((it) => {
+        t += cueLen(it.spoken || it.name, 1.5, settings) + GAP + session.reps * (cyc + pdrillHeard(it));
+      });
+      const totalReps = session.reps * session.items.length;
+      return t + Math.max(0, totalReps - 1) * (session.restSeconds + 3) + 2.4;
+    }
     if (session.kind === "mixed") {
       const forms = MT.loadForms();
       const order = MT.CLIP_DIVISIONS.filter((id) => session.divisions.indexOf(id) !== -1);
@@ -823,6 +913,19 @@
       const p = session.kind === "drill" ? drillParts(session, settings) : countParts(session, settings);
       const left = session.sets - info.set; // full sets after this one
       return (info.set === 1 ? p.intro : 0) + (left + 1) * p.set + left * p.between + p.tail;
+    }
+    if (session.kind === "pdrill") {
+      const cyc = pdrillCycle(settings);
+      const items = session.items;
+      const cur = items[info.item - 1];
+      let t = info.set === 1 ? cueLen(cur.spoken || cur.name, 1.5, settings) + GAP : 0;
+      let repsLeft = session.reps - info.set + 1; // reps of the current poomsae
+      t += repsLeft * (cyc + pdrillHeard(cur));
+      for (let i = info.item; i < items.length; i++) {
+        t += cueLen(items[i].spoken || items[i].name, 1.5, settings) + GAP + session.reps * (cyc + pdrillHeard(items[i]));
+        repsLeft += session.reps;
+      }
+      return t + Math.max(0, repsLeft - 1) * (session.restSeconds + 3) + 2.4;
     }
     if (session.kind === "mixed") {
       const forms = MT.loadForms();
