@@ -64,7 +64,9 @@
      the tempo: Color +0.1s, Black as listed, Competition Black −0.1s.
      Every drill ends the same way: no rest after the last set, just the
      finish chime — that's how athletes know the cycle is over.
-     kick: true shows the kick-hold option on the config screen. */
+     kick: true shows the kick-hold option on the config screen.
+     pooms splits Standing drills into a Single/Multiple Pooms chooser —
+     Multiple Pooms drill sets aren't built yet, so that tab is empty. */
   MT.PRESET_LEVELS = [
     { id: "comp", label: "Comp. Black", delta: -0.1 },
     { id: "black", label: "Black Belts", delta: 0 },
@@ -74,10 +76,10 @@
     { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
     { id: "round",  group: "Ground drills",   name: "Round House Kicks", tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
     { id: "side",   group: "Ground drills",   name: "Side Kicks",        tempo: 1.1, reps: 15, rest: 10, sets: 4, kick: true },
-    { id: "horse",  group: "Standing drills", name: "Horse Stance · Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
-    { id: "inplace", group: "Standing drills", name: "All Stances · In Place · Blocks/Attacks",     tempo: 1.0, reps: 20, rest: 10, sets: 4 },
-    { id: "udblock", group: "Standing drills", name: "All Stances · Up/Down · Blocks",              tempo: 1.5, reps: 20, rest: 10, sets: 4 },
-    { id: "udattack", group: "Standing drills", name: "All Stances · Up/Down · Attacks",            tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "horse",  group: "Standing drills", pooms: "single", name: "Horse Stance · Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "inplace", group: "Standing drills", pooms: "single", name: "All Stances · In Place · Blocks/Attacks",     tempo: 1.0, reps: 20, rest: 10, sets: 4 },
+    { id: "udblock", group: "Standing drills", pooms: "single", name: "All Stances · Up/Down · Blocks",              tempo: 1.5, reps: 20, rest: 10, sets: 4 },
+    { id: "udattack", group: "Standing drills", pooms: "single", name: "All Stances · Up/Down · Attacks",            tempo: 1.4, reps: 20, rest: 10, sets: 4 },
   ];
 
   /* Counting-drill levels. Interval presets are stored at the COMPETITION
@@ -95,92 +97,6 @@
     { v: 2.0, label: "Front kick" },
     { v: 2.3, label: "Round house" },
     { v: 2.5, label: "Side kick" },
-  ];
-
-  /* -------------------- Team USA Camp Fundraiser --------------------
-     The run of show for the Team USA Poomsae Camp Fundraiser, mirroring
-     the printed schedule. Blocks with `runs` are the app blocks — each
-     run is fully preset so the coach starts it with a single tap.
-       drill — base tempo comes from its PRESET_DRILLS id; the level seg
-               shifts it ±0.1s, same as Team Presets
-       count — interval stored at the comp reference; levels add +0.5/+1.0
-       goto  — jumps to another screen (nothing to preset)
-     Every technique on the schedule gets its own one-tap drill set. */
-  MT.CAMP_BLOCKS = [
-    { time: "1:00", title: "Opening", lead: "Coach Huy",
-      note: "Welcome + intros · 3 Team USA performances · rundown of the afternoon" },
-    { time: "1:15", title: "Warm Up", lead: "Coach Long",
-      note: "Korea university team style — full body, everyone loose and warm" },
-    { time: "1:35", title: "Water Break" },
-    { time: "1:40", title: "Taegeuk 1 & 2", lead: "Coach Huy",
-      note: "Loosening up, not correcting technique yet" },
-    {
-      time: "1:45", title: "Basic Rhythm & Tempo — Hands", lead: "Coach Long",
-      note: "One technique at a time — each drill stops when it's done, the app shows what's next, and the next one starts on your tap.",
-      runs: [
-        { type: "drill", preset: "inplace", name: "Front Stance · Low Block", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "inplace", name: "Front Stance · High Block", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "inplace", name: "Back Stance · Single Knife Hand", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "inplace", name: "Back Stance · Double Knife Hand", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "horse", name: "Horse Stance · Punch", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "horse", name: "Horse Stance · Low Block", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "horse", name: "Horse Stance · High Block", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "horse", name: "Horse Stance · Inward Block", reps: 20, setsPerRound: 2, rounds: 1, rest: 10 },
-      ],
-    },
-    { time: "2:00", title: "Water Break" },
-    {
-      time: "2:05", title: "Basic Kicking with Tempo", lead: "Coach Huy",
-      note: "5-second hold on the last kick of each set. Repeat the full cycle if the clock allows.",
-      runs: [
-        { type: "drill", preset: "front", name: "Front Kicks", reps: 10, setsPerRound: 4, rounds: 1, rest: 10, hold: 5 },
-        { type: "drill", preset: "round", name: "Round House Kicks", reps: 10, setsPerRound: 4, rounds: 1, rest: 10, hold: 5 },
-        { type: "drill", preset: "side", name: "Side Kicks", reps: 10, setsPerRound: 4, rounds: 1, rest: 10, hold: 5 },
-      ],
-    },
-    {
-      time: "2:30", title: "Intermediate Rhythm & Tempo — Hands", lead: "Coach Long",
-      note: "All stances, in place + up/down — each technique runs its own 2 sets of 16.",
-      runs: [
-        { type: "drill", preset: "udblock", name: "Back Stance · Outward Block", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udblock", name: "Back Stance · Single Knife Hand", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udblock", name: "Back Stance · Double Knife Hand", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udattack", name: "Front Stance · Punch / Palm Strike", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udblock", name: "Front Stance · Low Block / Sipjin Double Punch", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-        { type: "drill", preset: "udblock", name: "Walking Stance · Inward Block / Tiger Stance · T7 Palm Strike", reps: 16, setsPerRound: 2, rounds: 1, rest: 10 },
-      ],
-    },
-    { time: "2:50", title: "Water Break" },
-    {
-      time: "2:55", title: "Poomsae Kicks", lead: "Coach Bo Hyeon Kim",
-      note: "3 minutes of instruction per kick — all three covered by 3:20.",
-      runs: [
-        { type: "count", name: "Front Kick", interval: 2.0, target: 10, sets: 4, rest: 10 },
-        { type: "count", name: "Round House", interval: 2.3, target: 10, sets: 4, rest: 10 },
-        { type: "count", name: "Side Kick", interval: 2.5, target: 10, sets: 4, rest: 10 },
-      ],
-    },
-    {
-      time: "3:20", title: "Group Poomsae with Tempo",
-      note: "Instruction first, then execute — one run-through per group, back to back. Color belts: Coach Anh, Mika, Olivia · Cadets: Coach Long · Juniors/Seniors: Coach Bo Hyeon Kim · Freestyle: Coach Huy + freestyle athletes.",
-      runs: [
-        { type: "goto", goto: "build-forms", name: "Select Poomsae",
-          detail: "Pick each group's poomsae and run it with the tempo app" },
-      ],
-    },
-    { time: "3:25", title: "Water Break" },
-    { time: "3:30", title: "Focus Groups", lead: "All staff",
-      note: "Apps as needed — each group runs its own setting. Quick plan, get moving, back together by 4:30." },
-    { time: "4:30", title: "Water Break" },
-    {
-      time: "4:35", title: "Participant Showcase", lead: "Coach Huy",
-      note: "Color belt → Cadet → Junior → Senior black belt, 1 random poomsae each · Freestyle — 5 requirements. Run the cycle again if there's time.",
-      runs: [
-        { type: "goto", goto: "randomizer", name: "Poomsae Randomizer",
-          detail: "Draw one random poomsae per group" },
-      ],
-    },
-    { time: "4:55", title: "Thank You + Group Photo", lead: "Coach Huy" },
   ];
 
   // Belt sections. Divisions apply to Black Belt only.

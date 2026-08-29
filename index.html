@@ -10,11 +10,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=97" />
+  <link rel="stylesheet" href="css/styles.css?v=99" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=97" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=97" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=99" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=99" />
 </head>
 <body>
   <div id="app">
@@ -28,25 +28,20 @@
       </header>
 
       <div class="home-grid">
-        <button class="card big" data-goto="build-forms">
-          <span class="card-kicker">Poomsae</span>
+        <button class="card big" data-goto="poomsae-hub">
+          <span class="card-kicker">Poomsae Rhythm Trainer</span>
           <span class="card-title">Select Poomsae</span>
-          <span class="card-sub">Run 1&ndash;15 poomsae with their own rhythm, in sets, or randomized</span>
+          <span class="card-sub">Full poomsae &amp; intro drills, each at their own rhythm</span>
         </button>
         <button class="card big" data-goto="drills">
-          <span class="card-kicker">Drill</span>
+          <span class="card-kicker">TKD Drills Rhythm Trainer</span>
           <span class="card-title">Select Drills</span>
           <span class="card-sub">Custom drills, team presets &amp; general counting</span>
         </button>
         <button class="card big" data-goto="randomizer">
-          <span class="card-kicker">Randomize</span>
-          <span class="card-title">Poomsae Randomizer</span>
+          <span class="card-kicker">Poomsae Randomizer</span>
+          <span class="card-title">Randomize</span>
           <span class="card-sub">Pick a random poomsae for a belt rank or division</span>
-        </button>
-        <button class="card big" data-goto="camp">
-          <span class="card-kicker">Event</span>
-          <span class="card-title">Team USA Poomsae Camp Fundraiser</span>
-          <span class="card-sub">The run of show &mdash; every app block preset, one tap to run</span>
         </button>
         <button class="card" data-goto="editor">
           <span class="card-title">Rhythm Editor</span>
@@ -59,11 +54,31 @@
       </div>
     </section>
 
+    <!-- ================= POOMSAE HUB ================= -->
+    <section class="screen" data-screen="poomsae-hub">
+      <div class="topbar">
+        <button class="icon-btn" data-goto="home">&larr;</button>
+        <h1>Poomsae Rhythm Trainer</h1>
+      </div>
+      <div class="home-grid">
+        <button class="card big" data-goto="build-forms">
+          <span class="card-kicker">Option 1</span>
+          <span class="card-title">Full Poomsae</span>
+          <span class="card-sub">Run 1&ndash;15 poomsae with their own rhythm, in sets, or randomized</span>
+        </button>
+        <button class="card big" data-goto="build-pdrill">
+          <span class="card-kicker">Option 2</span>
+          <span class="card-title">Intro Poomsaes</span>
+          <span class="card-sub">The opening of a poomsae on repeat &mdash; Joonbi &rarr; Sijak &rarr; stop &rarr; Baro</span>
+        </button>
+      </div>
+    </section>
+
     <!-- ================= BUILD: FORMS ================= -->
     <section class="screen" data-screen="build-forms">
       <div class="topbar">
-        <button class="icon-btn" data-goto="home">&larr;</button>
-        <h1>Select Poomsae</h1>
+        <button class="icon-btn" data-goto="poomsae-hub">&larr;</button>
+        <h1>Full Poomsae</h1>
       </div>
 
       <div class="panel">
@@ -161,34 +176,14 @@
           <span class="card-title">General Counting</span>
           <span class="card-sub">The app counts out loud while the coach calls the drill</span>
         </button>
-        <button class="card big" data-goto="poomsae-drills">
-          <span class="card-kicker">Option 4</span>
-          <span class="card-title">Poomsae Drills</span>
-          <span class="card-sub">Sections of a poomsae on repeat, at each division's tempo</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- ================= POOMSAE DRILLS HUB ================= -->
-    <section class="screen" data-screen="poomsae-drills">
-      <div class="topbar">
-        <button class="icon-btn" data-goto="drills">&larr;</button>
-        <h1>Poomsae Drills</h1>
-      </div>
-      <div class="home-grid">
-        <button class="card big" data-goto="build-pdrill">
-          <span class="card-kicker">Option 1</span>
-          <span class="card-title">Poomsae Intro</span>
-          <span class="card-sub">The opening of a poomsae on repeat &mdash; Joonbi &rarr; Sijak &rarr; stop &rarr; Baro</span>
-        </button>
       </div>
     </section>
 
     <!-- ================= POOMSAE DRILLS: INTRO ================= -->
     <section class="screen" data-screen="build-pdrill">
       <div class="topbar">
-        <button class="icon-btn" data-goto="poomsae-drills">&larr;</button>
-        <h1>Poomsae Intro</h1>
+        <button class="icon-btn" data-goto="poomsae-hub">&larr;</button>
+        <h1>Intro Poomsaes</h1>
       </div>
 
       <div class="panel">
@@ -206,7 +201,34 @@
       <div class="panel">
         <h2>1 &middot; Choose poomsae</h2>
         <p class="hint">Each rep plays the poomsae's opening at this division's tempo, then stops &mdash; Joonbi &rarr; Sijak &rarr; intro &rarr; Baro &rarr; rest &rarr; 3-2-1. Only poomsae with a drill end set up appear here.</p>
-        <div id="pdrill-checklist" class="checklist"></div>
+        <div class="seg" id="pdrill-mode">
+          <button class="seg-btn active" data-mode="pick">Pick manually</button>
+          <button class="seg-btn" data-mode="random">Random from range</button>
+        </div>
+
+        <div id="pdrill-pick" class="mode-block">
+          <div id="pdrill-checklist" class="checklist"></div>
+        </div>
+
+        <div id="pdrill-random" class="mode-block hidden">
+          <label class="field">
+            <span>From poomsae #</span>
+            <select id="pdrill-rand-from"></select>
+          </label>
+          <label class="field">
+            <span>To poomsae #</span>
+            <select id="pdrill-rand-to"></select>
+          </label>
+          <label class="field">
+            <span>How many to draw</span>
+            <input type="number" id="pdrill-rand-count" min="1" max="15" value="3" />
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="pdrill-rand-norepeat" checked />
+            <span>No repeats until the pool is used up</span>
+          </label>
+          <p class="hint">The poomsae name is announced out loud before each one.</p>
+        </div>
       </div>
 
       <div class="panel">
@@ -397,19 +419,6 @@
       <button class="start-btn" id="rz-go">&#127922; Randomize</button>
     </section>
 
-    <!-- ================= TEAM USA CAMP FUNDRAISER ================= -->
-    <section class="screen" data-screen="camp">
-      <div class="topbar">
-        <button class="icon-btn" data-goto="home">&larr;</button>
-        <h1>Team USA Camp</h1>
-      </div>
-      <div class="panel">
-        <h2>Level</h2>
-        <div class="seg" id="camp-level"></div>
-      </div>
-      <div id="camp-list"></div>
-    </section>
-
     <!-- ================= RUN ================= -->
     <section class="screen run" data-screen="run">
       <div class="run-top">
@@ -430,8 +439,6 @@
       </div>
 
       <div class="run-bottom">
-        <div class="run-upnext" id="run-upnext" hidden></div>
-        <button class="run-next" id="run-next" hidden></button>
         <div class="run-timeleft" id="run-timeleft"></div>
         <div class="progress" id="run-progressbar">
           <div id="run-progress" class="progress-bar"></div>
@@ -589,9 +596,9 @@
   </div>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=97"></script>
-  <script src="js/audio.js?v=97"></script>
-  <script src="js/engine.js?v=97"></script>
-  <script src="js/app.js?v=97"></script>
+  <script src="js/data.js?v=99"></script>
+  <script src="js/audio.js?v=99"></script>
+  <script src="js/engine.js?v=99"></script>
+  <script src="js/app.js?v=99"></script>
 </body>
 </html>
