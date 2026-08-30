@@ -225,6 +225,16 @@
   // Beat of silence between phases (seconds).
   const GAP = 1.0;
 
+  // Speed-boosted copy of a counts array (metronome fallback): regular counts
+  // shrink by the boost; tension (5/8) counts keep their fixed 1s-per-count
+  // pace — the boost only speeds up the movement around them.
+  function boostCounts(counts, boost) {
+    if (!(boost > 1)) return counts || [];
+    return (counts || []).map((c) =>
+      c.tension ? c : { ...c, duration: Math.max(0.1, c.duration / boost) }
+    );
+  }
+
   // Play the poomsae's real audio clip (counting is baked into the audio);
   // resolves when it ends or is stopped.
   function playClip(item, player, cb) {
@@ -236,7 +246,9 @@
         ? MT.resolveClip(item.section, item.division, item.id)
         : { section: item.section, division: item.division, id: item.id, rate: 1 };
       if (!clip) return resolve();
-      const rate = clip.rate || 1;
+      // User speed boost stacks on the division's rate. clipPlan still holds
+      // the 5/8 count sections at the recording's own speed, whatever this is.
+      const rate = (clip.rate || 1) * (item.boost > 0 ? item.boost : 1);
       // Poomsae Intro drill: cut the plan at the marked drill end (a position
       // in the recording, so every division stops at the same movement).
       const introEnd = item.intro && MT.getIntroEnd ? MT.getIntroEnd(clip.section, clip.division, clip.id) : 0;
@@ -412,7 +424,7 @@
     if (item.section && MT.resolveClip && MT.resolveClip(item.section, item.division, item.id)) {
       await playClip(item, player, cb);
     } else {
-      await runCounts(item.counts, item.sound, player, cb, settings);
+      await runCounts(boostCounts(item.counts, item.boost), item.sound, player, cb, settings);
     }
     if (stopped(player)) return;
     cb.onPhase("hold", "—");
@@ -551,6 +563,7 @@
         announce: true,
         section: "black",
         division: div,
+        boost: session.boost,
       };
       cb.onItem({
         set: r + 1,
@@ -779,6 +792,7 @@
       announce: true,
       section: config.section,
       division: config.division,
+      boost: config.boost || 1,
     });
     if (config.mode === "pick") {
       return config.ids.map((id) => mk(forms.find((x) => x.id === id)));
@@ -849,10 +863,11 @@
     if (item.section && MT.resolveClip) {
       const clip = MT.resolveClip(item.section, item.division, item.id);
       if (clip && MT.clipPlan) {
-        perf = MT.clipPlan(clip.section, clip.division, clip.id, clip.rate || 1).duration;
+        const rate = (clip.rate || 1) * (item.boost > 0 ? item.boost : 1);
+        perf = MT.clipPlan(clip.section, clip.division, clip.id, rate).duration;
       }
     }
-    if (!perf) perf = MT.countsDuration(item.counts);
+    if (!perf) perf = MT.countsDuration(boostCounts(item.counts, item.boost));
     t += perf;
     t += 1 + cueLen(MT.CUES.baro.say, 0.9, settings) + 0.5 + 5 * beat + 0.5;
     t += cueLen(MT.CUES.swieo.say, 0.7, settings);
@@ -894,12 +909,12 @@
     );
   }
   function pdrillHeard(item) {
-    return MT.introDuration ? MT.introDuration(item.section, item.division, item.id) : 0;
+    return MT.introDuration ? MT.introDuration(item.section, item.division, item.id, item.boost) : 0;
   }
 
   // Average poomsae length for one Mixed round of `div` — the draw is random,
   // so the mean over that division's pool is the honest estimate.
-  function mixedRoundAvg(div, forms, settings) {
+  function mixedRoundAvg(div, forms, settings, boost) {
     const allIds = forms.map((f) => f.id);
     const ids = (MT.MIXED_POOMSAE[div] || MT.poomsaeIdsFor("black", div, forms)).filter(
       (id) => allIds.indexOf(id) !== -1
@@ -909,7 +924,7 @@
     ids.forEach((id) => {
       const f = forms.find((x) => x.id === id);
       sum += MT.estimatePoomsaeItem(
-        { id: f.id, name: f.name, spoken: f.spoken, counts: f.counts, announce: true, section: "black", division: div },
+        { id: f.id, name: f.name, spoken: f.spoken, counts: f.counts, announce: true, section: "black", division: div, boost },
         settings
       );
     });
@@ -937,7 +952,7 @@
       const order = MT.CLIP_DIVISIONS.filter((id) => session.divisions.indexOf(id) !== -1);
       if (!order.length) return 0;
       let t = 0;
-      for (let r = 0; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings);
+      for (let r = 0; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings, session.boost);
       return t + Math.max(0, session.rounds - 1) * session.switchSeconds + (session.rounds > 1 ? 2.4 : 0);
     }
     let per = 0;
@@ -979,11 +994,11 @@
       const f = forms.find((x) => x.id === info.id);
       if (f) {
         t += MT.estimatePoomsaeItem(
-          { id: f.id, name: f.name, spoken: f.spoken, counts: f.counts, announce: true, section: "black", division: info.division },
+          { id: f.id, name: f.name, spoken: f.spoken, counts: f.counts, announce: true, section: "black", division: info.division, boost: session.boost },
           settings
         );
       }
-      for (let r = info.set; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings);
+      for (let r = info.set; r < session.rounds; r++) t += mixedRoundAvg(order[r % order.length], forms, settings, session.boost);
       return t + (session.rounds - info.set) * session.switchSeconds + (session.rounds > 1 ? 2.4 : 0);
     }
     const items = session.items;

@@ -819,12 +819,14 @@
   };
   // Heard length of the intro for what (section, division) actually plays —
   // 0 when there's no clip or no drill end marked (the drill hides those).
-  MT.introDuration = function (section, division, id) {
+  // `boost` is the optional user speed boost stacked on the division's rate.
+  MT.introDuration = function (section, division, id, boost) {
     const clip = MT.resolveClip(section, division, id);
     if (!clip) return 0;
     const end = MT.getIntroEnd(clip.section, clip.division, clip.id);
     if (!(end > 0)) return 0;
-    return MT.clipPlan(clip.section, clip.division, clip.id, clip.rate || 1, undefined, end).duration;
+    const rate = (clip.rate || 1) * (boost > 0 ? boost : 1);
+    return MT.clipPlan(clip.section, clip.division, clip.id, rate, undefined, end).duration;
   };
 
   /* A playback plan: the recording sliced into segments, each with its own

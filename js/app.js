@@ -119,15 +119,25 @@
       if (!isAdmin && (dest === "editor" || dest === "settings")) return;
       if (dest === "editor") renderEditor();
       if (dest === "settings") renderSettings();
-      if (dest === "build-forms") renderFormsBuilder();
+      if (dest === "build-forms") {
+        formsBoost = 1; // speed boost always starts at Normal
+        renderFormsBuilder();
+      }
       if (dest === "build-drill") renderDrillBuilder();
-      if (dest === "preset-drills") renderPresetList();
+      if (dest === "preset-drills") {
+        // A fresh landing from the Drills hub starts at the Standing/Ground
+        // chooser; coming back from a config screen keeps the open group.
+        const cur = document.querySelector(".screen.active");
+        if (cur && cur.dataset.screen === "drills") presetGroup = null;
+        renderPresetList();
+      }
       if (dest === "build-count") renderCountBuilder();
       if (dest === "randomizer") renderRandomizer();
       if (dest === "build-pdrill") {
         // The list depends on decoded audio — this tap is a user gesture, so
         // unlock, decode anything pending (iOS), then render with real data.
         MT.unlockAudio();
+        pdrillBoost = 1; // speed boost always starts at Normal
         renderPdrillBuilder();
         if (MT.decodePendingClips) {
           Promise.resolve(MT.decodePendingClips()).then(() => {
@@ -157,6 +167,7 @@
   /* -------------------- FORMS builder -------------------- */
   let formsSection = "black";
   let formsDivision = "cadet";
+  let formsBoost = 1; // user speed boost — resets to Normal on entry
   function sectionForms(section, division) {
     const all = MT.loadForms();
     const ids = MT.poomsaeIdsFor(section, division, all);
@@ -172,6 +183,7 @@
       announce: true,
       section,
       division: section === "black" ? division : "",
+      boost: formsBoost,
     };
   }
   // Total-time line under the builder — recomputed on every selection change.
@@ -189,6 +201,7 @@
         divisions,
         rounds: Math.max(1, Number($("#mixed-rounds").value) || 1),
         switchSeconds: Math.max(0, Number($("#mixed-switch").value) || 0),
+        boost: formsBoost,
       });
       el.textContent = "Est. total: ~" + MT.fmtTime(t) + " · varies with the draw";
       return;
@@ -237,6 +250,8 @@
       (d) => `<option value="${d.id}">${d.label}</option>`
     ).join("");
     $("#forms-division").value = formsDivision;
+
+    renderBoostChips("#forms-boost", formsBoost);
 
     // Mixed mode: swap the normal poomsae panels for the rotation config.
     const isMixed = formsSection === "black" && formsDivision === "mixed";
@@ -322,6 +337,8 @@
         divisions,
         rounds: Math.max(1, Number($("#mixed-rounds").value) || 1),
         switchSeconds: Math.max(0, Number($("#mixed-switch").value) || 0),
+        boost: formsBoost,
+        tempoLabel: boostLabel(formsBoost),
       });
       return;
     }
@@ -346,16 +363,18 @@
     }
     config.section = formsSection;
     config.division = formsSection === "black" ? formsDivision : "";
+    config.boost = formsBoost;
     const items = MT.buildFormItems(config, MT.loadForms());
     startRun({
       items,
       sets: 1,
       restSeconds: Math.max(0, Number($("#forms-rest").value) || 0),
+      tempoLabel: boostLabel(formsBoost),
     });
   });
 
   /* -------------------- DRILL builder -------------------- */
-  let drillSound = "woodblock";
+  let drillSound = "drum";
   function renderDrillBuilder() {
     fillTempoSelect($("#drill-tempo"), 0.8, "", MT.DRILL_TEMPOS);
     fillHoldSelect($("#drill-hold"), 0);
@@ -422,8 +441,9 @@
   /* -------------------- PRESET DRILLS (Team Presets) -------------------- */
   let presetLevel = "black";
   let presetDrill = null; // the preset opened on the config screen
-  let presetSound = "woodblock";
+  let presetSound = "drum";
   let standingPooms = "single"; // Standing drills chooser — Single vs Multiple Pooms
+  let presetGroup = null; // which drill group is open — null shows the chooser
 
   function renderPresetSoundChips() {
     $("#preset-sound-chips").innerHTML = MT.SOUNDS.map(
@@ -454,15 +474,34 @@
   function presetEstimate(d, tempo) {
     return MT.estimateSession({
       kind: "drill",
-      items: [MT.drillToItem({ name: d.name, reps: d.reps, duration: tempo, sound: "woodblock" })],
+      items: [MT.drillToItem({ name: d.name, reps: d.reps, duration: tempo, sound: "drum" })],
       sets: d.sets,
       restSeconds: d.rest,
     });
   }
   function renderPresetList() {
+    // Landing view: pick Standing or Ground drills first. The level pills and
+    // drill rows only show once a group is open.
+    $("#preset-level").closest(".panel").hidden = !presetGroup;
+    if (!presetGroup) {
+      $("#preset-list").innerHTML = `
+      <div class="home-grid">
+        <button class="card big" data-pgroup="Standing drills">
+          <span class="card-kicker">Option 1</span>
+          <span class="card-title">Standing Drills</span>
+          <span class="card-sub">Stance work &mdash; blocks &amp; attacks, single &amp; multiple pooms</span>
+        </button>
+        <button class="card big" data-pgroup="Ground drills">
+          <span class="card-kicker">Option 2</span>
+          <span class="card-title">Ground Drills</span>
+          <span class="card-sub">Kicking drills &mdash; front, round house &amp; side kicks</span>
+        </button>
+      </div>`;
+      return;
+    }
     renderLevelSeg("#preset-level");
     const groups = [];
-    MT.PRESET_DRILLS.forEach((d) => {
+    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup).forEach((d) => {
       let g = groups.find((x) => x.name === d.group);
       if (!g) groups.push((g = { name: d.group, drills: [] }));
       g.drills.push(d);
@@ -470,7 +509,6 @@
     $("#preset-list").innerHTML = groups
       .map((g) => {
         // A group with `pooms` drills gets the Single/Multiple Pooms chooser.
-        // Multiple Pooms has no drill sets yet — the tab just says so.
         const hasPooms = g.drills.some((d) => d.pooms);
         const drills = hasPooms
           ? g.drills.filter((d) => (d.pooms || "single") === standingPooms)
@@ -491,7 +529,7 @@
             </button>`
               )
               .join("")
-          : `<p class="hint">No Multiple Pooms drills yet &mdash; coming soon.</p>`;
+          : `<p class="hint">No drills here yet.</p>`;
         return `
       <div class="panel">
         <h2>${g.name}</h2>
@@ -507,7 +545,23 @@
     presetLevel = b.dataset.level;
     renderPresetList();
   });
+  // The topbar back arrow steps the flow back: group view → chooser first;
+  // on the chooser it falls through to its data-goto (the Drills hub).
+  $('.screen[data-screen="preset-drills"] .topbar .icon-btn').addEventListener("click", (e) => {
+    if (!presetGroup) return;
+    presetGroup = null;
+    renderPresetList();
+    window.scrollTo(0, 0);
+    e.stopPropagation(); // keep the data-goto router from leaving the screen
+  });
   $("#preset-list").addEventListener("click", (e) => {
+    const grp = e.target.closest("[data-pgroup]");
+    if (grp) {
+      presetGroup = grp.dataset.pgroup;
+      renderPresetList();
+      window.scrollTo(0, 0);
+      return;
+    }
     const pooms = e.target.closest("[data-pooms]");
     if (pooms) {
       standingPooms = pooms.dataset.pooms;
@@ -688,6 +742,7 @@
   /* -------------------- POOMSAE DRILLS: INTRO -------------------- */
   let pdrillSection = "black";
   let pdrillDivision = "cadet";
+  let pdrillBoost = 1; // user speed boost — resets to Normal on entry
   const pdrillDiv = () => (pdrillSection === "black" ? pdrillDivision : "");
   // Only poomsae whose recording has a drill end marked (and audio decoded).
   function pdrillForms() {
@@ -697,7 +752,7 @@
   }
   // A form as the pdrill-item shape the estimator expects.
   function pdrillEstItem(f) {
-    return { id: f.id, name: f.name, spoken: f.spoken, section: pdrillSection, division: pdrillDiv() };
+    return { id: f.id, name: f.name, spoken: f.spoken, section: pdrillSection, division: pdrillDiv(), boost: pdrillBoost };
   }
 
   function renderPdrillBuilder() {
@@ -710,6 +765,7 @@
       return `<option value="${d.id}">${d.label}</option>`;
     }).join("");
     $("#pdrill-division").value = pdrillDivision;
+    renderBoostChips("#pdrill-boost", pdrillBoost);
 
     const division = pdrillDiv();
     const list = pdrillForms();
@@ -720,7 +776,7 @@
       <label class="check-item">
         <input type="checkbox" value="${f.id}" />
         <span class="ci-name">${f.id}. ${f.name}</span>
-        <span class="ci-meta">~${MT.fmtTime(MT.introDuration(pdrillSection, division, f.id))} intro</span>
+        <span class="ci-meta">~${MT.fmtTime(MT.introDuration(pdrillSection, division, f.id, pdrillBoost))} intro</span>
       </label>`
           )
           .join("")
@@ -849,6 +905,7 @@
       announce: true,
       section: pdrillSection,
       division: pdrillDiv(),
+      boost: pdrillBoost,
       intro: true, // playClip cuts the audio at the marked drill end
     }));
     startRun({
@@ -856,8 +913,66 @@
       items,
       reps: Math.max(1, Number($("#pdrill-reps").value) || 1),
       restSeconds: Math.max(0, Number($("#pdrill-rest").value) || 0),
-      tempoLabel: "Poomsae Intro",
+      tempoLabel: "Poomsae Intro" + (pdrillBoost > 1 ? " · " + boostLabel(pdrillBoost) : ""),
     });
+  });
+
+  /* -------------------- SPEED BOOST (Rhythm Trainer) --------------------
+     Optional overspeed for Full Poomsae and Intro Poomsaes. The boost stacks
+     on the division's own rate, and the 5/8 count sections are untouched:
+     clipPlan always holds them at the recording's own pace, and metronome
+     tension counts stay at 1s per count. Resets to Normal on entry. */
+  const BOOST_CHIPS = [
+    { v: 1, label: "Normal" },
+    { v: 1.05, label: "+5%" },
+    { v: 1.1, label: "+10%" },
+    { v: 1.15, label: "+15%" },
+    { v: 1.2, label: "+20%" },
+  ];
+  function renderBoostChips(sel, cur) {
+    $(sel).innerHTML = BOOST_CHIPS.map(
+      (b) =>
+        `<button class="sound-chip ${Math.abs(b.v - cur) < 0.001 ? "active" : ""}" data-boost="${b.v}">${b.label}</button>`
+    ).join("");
+  }
+  const boostLabel = (boost) => (boost > 1 ? "+" + Math.round((boost - 1) * 100) + "% speed" : "");
+  // Refresh the per-poomsae times a boost change touches WITHOUT rebuilding
+  // the checklist (a full re-render would wipe the checked poomsae).
+  function refreshFormsMetas() {
+    const all = MT.loadForms();
+    const settings = MT.loadSettings();
+    $$("#forms-checklist .check-item").forEach((el) => {
+      const f = all.find((x) => x.id === Number(el.querySelector("input").value));
+      const meta = el.querySelector(".ci-meta");
+      if (f && meta)
+        meta.textContent = `${f.movements} Pooms · ~${MT.fmtTime(
+          MT.estimatePoomsaeItem(formItemFor(f, formsSection, formsDivision), settings)
+        )}`;
+    });
+    updateFormsEst();
+  }
+  function refreshPdrillMetas() {
+    $$("#pdrill-checklist .check-item").forEach((el) => {
+      const id = Number(el.querySelector("input").value);
+      const meta = el.querySelector(".ci-meta");
+      if (meta)
+        meta.textContent = "~" + MT.fmtTime(MT.introDuration(pdrillSection, pdrillDiv(), id, pdrillBoost)) + " intro";
+    });
+    updatePdrillEst();
+  }
+  $("#forms-boost").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-boost]");
+    if (!chip) return;
+    formsBoost = Number(chip.dataset.boost) || 1;
+    renderBoostChips("#forms-boost", formsBoost);
+    refreshFormsMetas();
+  });
+  $("#pdrill-boost").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-boost]");
+    if (!chip) return;
+    pdrillBoost = Number(chip.dataset.boost) || 1;
+    renderBoostChips("#pdrill-boost", pdrillBoost);
+    refreshPdrillMetas();
   });
 
   /* -------------------- POOMSAE RANDOMIZER -------------------- */
