@@ -242,6 +242,7 @@
   }
   function renderFormsBuilder() {
     forms = MT.loadForms();
+    if (MT.prioritizeDivision) MT.prioritizeDivision(formsSection, formsSection === "black" ? formsDivision : "");
     $$("#forms-section .seg-btn").forEach((b) =>
       b.classList.toggle("active", b.dataset.section === formsSection)
     );
@@ -756,6 +757,7 @@
   }
 
   function renderPdrillBuilder() {
+    if (MT.prioritizeDivision) MT.prioritizeDivision(pdrillSection, pdrillDiv());
     $$("#pdrill-section .seg-btn").forEach((b) =>
       b.classList.toggle("active", b.dataset.section === pdrillSection)
     );
@@ -780,6 +782,8 @@
       </label>`
           )
           .join("")
+      : MT.clipsLoading && MT.clipsLoading()
+      ? `<p class="hint">Loading audio… this list fills in as the recordings download.</p>`
       : `<p class="hint">No intro points set up for this selection yet.</p>`;
 
     const opts = list
@@ -1051,6 +1055,7 @@
   /* -------------------- RUN view -------------------- */
   const PHASE_LABELS = {
     announce: "Next Poomsae",
+    loading: "Loading audio",
     joonbi: "Joonbi",
     count: "Ready",
     sijak: "Sijak!",
@@ -1202,6 +1207,9 @@
           elCount.textContent = "";
           elMax.textContent = "";
           elTitle.textContent = poomTitle(label, num);
+        } else if (phase === "loading") {
+          elCount.textContent = "…";
+          elMax.textContent = "downloading the recording";
         } else if (phase === "go") {
           elCount.textContent = "1";
         } else if (phase === "done") {
@@ -2171,19 +2179,70 @@
     const active = document.querySelector(".screen.active");
     if (!active) return;
     const name = active.dataset.screen;
+    const restore = keepChoices(active);
     if (name === "build-forms") renderFormsBuilder();
     else if (name === "build-drill") updateDrillEst();
     else if (name === "build-count") updateCountEst();
     else if (name === "preset-drills") renderPresetList();
     else if (name === "preset-config") updatePresetEst();
     else if (name === "build-pdrill") renderPdrillBuilder();
+    restore();
+    if (name === "build-forms") updateFormsEst();
+    else if (name === "build-pdrill") updatePdrillEst();
+  }
+  // Clips now land one by one, so a refresh can happen while someone is
+  // picking poomsae. Snapshot the ticked boxes and dropdowns on screen and put
+  // them back after the re-render.
+  function keepChoices(screen) {
+    const ticked = $$(".check-item input", screen)
+      .filter((c) => c.checked)
+      .map((c) => ((c.closest("[id]") || {}).id || "") + ":" + c.value);
+    const picks = $$("select[id]", screen).map((s) => [s.id, s.value]);
+    return () => {
+      $$(".check-item input", screen).forEach((c) => {
+        if (ticked.indexOf(((c.closest("[id]") || {}).id || "") + ":" + c.value) !== -1) c.checked = true;
+      });
+      picks.forEach(([id, v]) => {
+        const s = document.getElementById(id);
+        if (s && Array.from(s.options).some((o) => o.value === v)) s.value = v;
+      });
+    };
+  }
+  // Recordings arrive in the background — refresh the builder when they do
+  // (not mid-run; the run screen re-anchors its own estimate per item).
+  MT.onClipsChanged = function () {
+    if (!document.body.classList.contains("running")) refreshEstimates();
+  };
+
+  // Offline support (sw.js): after one visit the app and every recording are
+  // kept on the phone, so it works in a gym with no signal or abroad. Off on
+  // localhost so dev edits always show; ?sw=1 turns it on there for testing.
+  const localDev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && _params.get("sw") !== "1";
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !localDev) {
+    MT.offlineEnabled = true;
+    navigator.serviceWorker
+      .register("sw.js")
+      .then(() => {
+        // First visit: this page loaded before the worker existed, so cache
+        // the app files now. Recordings stash themselves as they download.
+        if (navigator.serviceWorker.controller || !window.caches) return;
+        const urls = new Set(["index.html", "data/clips.json", "data/tempomap.json", "assets/logo1.JPG", "assets/logo-light.svg"]);
+        $$("script[src], link[href]").forEach((el) => urls.add(el.getAttribute("src") || el.getAttribute("href")));
+        caches.open(MT.OFFLINE_CACHE).then((c) =>
+          urls.forEach((u) => {
+            const abs = new URL(u, location.href);
+            if (abs.origin === location.origin) c.add(abs.href).catch(() => {});
+          })
+        );
+      })
+      .catch(() => {});
   }
 
   // Initialize voice choice + tuning on load, and preload recorded name clips.
   MT.setVoiceURI(settings.voiceURI);
   MT.setVoiceTuning(settings);
-  // Load the team's shipped clips from the repo, then the admin's local
-  // uploads (which take precedence for authoring/preview).
+  // Load the admin's local uploads, then the team's shipped clips from the
+  // repo (a local upload takes precedence for authoring/preview).
   if (MT.loadClips) MT.loadClips().then(() => MT.loadRepoClips && MT.loadRepoClips()).then(refreshEstimates);
   else if (MT.loadRepoClips) MT.loadRepoClips().then(refreshEstimates);
   // Published speed matches (division → U30 base at an adjusted speed).

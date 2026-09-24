@@ -283,8 +283,13 @@
       keys.map(async (k) => {
         if (VOICE_CACHE.has(k) || VOICE_PENDING.has(k)) return;
         try {
-          const r = await fetch("audio/voice/" + k + ".m4a");
-          if (r.ok) VOICE_PENDING.set(k, await r.arrayBuffer());
+          const url = "audio/voice/" + k + ".m4a";
+          const r = await fetch(url);
+          if (r.ok) {
+            const buf = await r.arrayBuffer();
+            stashForOffline(url, buf, r);
+            VOICE_PENDING.set(k, buf);
+          }
         } catch (e) {}
       })
     );
@@ -582,50 +587,261 @@
   // load on iPhones and every poomsae falls back to the metronome.
   const REPO_PENDING = new Map(); // key -> ArrayBuffer
 
+  // Download queue for the repo clips. Files come down a few at a time, the
+  // clip about to run jumps the line, and each one is playable as soon as it
+  // lands. The old loader fetched one file at a time and decoded only at the
+  // very end, so on a slow connection (roaming abroad) every poomsae sat on
+  // the metronome for minutes with no sign anything was happening.
+  const REPO_FILES = new Map(); // key -> file path, from data/clips.json
+  const REPO_FAILED = new Set(); // keys that couldn't download/decode this visit
+  const REPO_INFLIGHT = new Set();
+  const REPO_DECODING = new Set();
+  const REPO_PARALLEL = 3;
+  let repoQueue = [];
+  let repoPriority = []; // newest first: exact keys or "section|division|" prefixes
+  let repoIdle = []; // resolvers waiting for the queue to drain
+  let repoManifestDone = false;
+  let tempoMapDone = false;
+
+  MT.OFFLINE_CACHE = "mteam-rhythm-v1"; // must match CACHE in sw.js
+
+  // First visit: the service worker isn't in control yet, so it never sees
+  // these downloads. Put them in its cache ourselves so the next visit (even
+  // offline) doesn't download them again. app.js sets offlineEnabled.
+  function stashForOffline(url, buf, res) {
+    try {
+      if (!MT.offlineEnabled || !window.caches) return;
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) return;
+      const headers = {};
+      ["Content-Type", "ETag", "Last-Modified"].forEach((h) => {
+        const v = res.headers.get(h);
+        if (v) headers[h] = v;
+      });
+      caches
+        .open(MT.OFFLINE_CACHE)
+        .then((c) => c.put(new URL(url, location.href).href, new Response(buf.slice(0), { headers })))
+        .catch(() => {});
+    } catch (e) {}
+  }
+
+  function fetchTimeout(url, ms) {
+    const ctl = window.AbortController ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), ms) : 0;
+    return fetch(url, ctl ? { signal: ctl.signal } : undefined).finally(() => clearTimeout(t));
+  }
+
+  // Fetch an audio file as an ArrayBuffer. A download that stalls (no bytes
+  // for 20s) is dropped and retried, up to 3 tries, so one dropped connection
+  // doesn't lose the clip for the whole visit. A 404 isn't retried.
+  async function fetchAudio(url) {
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, attempt * 2000));
+      const ctl = window.AbortController ? new AbortController() : null;
+      let timer = 0;
+      const arm = () => {
+        if (!ctl) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => ctl.abort(), 20000);
+      };
+      try {
+        arm();
+        const res = await fetch(url, ctl ? { signal: ctl.signal } : undefined);
+        if (res.status === 404) throw Object.assign(new Error("missing " + url), { fatal: true });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        let buf;
+        if (res.body && res.body.getReader) {
+          const reader = res.body.getReader();
+          const parts = [];
+          let len = 0;
+          for (;;) {
+            arm();
+            const { done, value } = await reader.read();
+            if (done) break;
+            parts.push(value);
+            len += value.length;
+          }
+          const out = new Uint8Array(len);
+          let o = 0;
+          parts.forEach((p) => {
+            out.set(p, o);
+            o += p.length;
+          });
+          buf = out.buffer;
+        } else {
+          clearTimeout(timer);
+          buf = await res.arrayBuffer();
+        }
+        stashForOffline(url, buf, res);
+        return buf;
+      } catch (e) {
+        lastErr = e;
+        if (e.fatal) break;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw lastErr;
+  }
+
+  // Tell app.js the set of playable clips changed (estimates, Intro list).
+  // Debounced — a burst of arrivals re-renders once.
+  let clipsChangedTimer = 0;
+  function clipsChanged() {
+    clearTimeout(clipsChangedTimer);
+    clipsChangedTimer = setTimeout(() => {
+      if (MT.onClipsChanged) MT.onClipsChanged();
+    }, 600);
+  }
+
+  function repoRank(k) {
+    for (let i = 0; i < repoPriority.length; i++) {
+      const p = repoPriority[i];
+      if (p.endsWith("|") ? k.indexOf(p) === 0 : k === p) return i;
+    }
+    return Infinity;
+  }
+  function pumpRepo() {
+    repoQueue.sort((a, b) => {
+      const ra = repoRank(a);
+      const rb = repoRank(b);
+      return ra === rb ? 0 : ra < rb ? -1 : 1;
+    });
+    while (REPO_INFLIGHT.size < REPO_PARALLEL && repoQueue.length) {
+      const k = repoQueue.shift();
+      // Skip anything already here — including a local upload, which wins.
+      if (CLIP_CACHE.has(k) || REPO_PENDING.has(k) || REPO_FAILED.has(k) || REPO_INFLIGHT.has(k)) continue;
+      REPO_INFLIGHT.add(k);
+      fetchAudio(REPO_FILES.get(k))
+        .then((buf) => {
+          REPO_PENDING.set(k, buf);
+          return decodeOne(k);
+        })
+        .catch(() => {
+          REPO_FAILED.add(k);
+          dlog("clip failed " + k);
+        })
+        .then(() => {
+          REPO_INFLIGHT.delete(k);
+          clipsChanged();
+          pumpRepo();
+        });
+    }
+    if (!REPO_INFLIGHT.size && !repoQueue.length) repoIdle.splice(0).forEach((r) => r());
+  }
+
   // Clips shipped in the repo (data/clips.json + audio files). This is how the
-  // whole team gets the audio — no browser upload needed.
+  // whole team gets the audio — no browser upload needed. Resolves once every
+  // file has landed or given up; each clip is playable as soon as it lands.
   MT.loadRepoClips = async function () {
     ensureContext();
-    let manifest;
     try {
-      const res = await fetch("data/clips.json?ts=" + Date.now());
-      if (!res.ok) return;
-      manifest = await res.json();
-    } catch (e) {
-      return;
-    }
-    const list = (manifest && manifest.clips) || [];
-    for (const c of list) {
-      const k = clipKey(c.section, c.division || "", c.poomsae);
-      if (!c.file || CLIP_CACHE.has(k) || REPO_PENDING.has(k)) continue; // don't clobber a local upload
-      try {
-        const r = await fetch(c.file);
-        if (!r.ok) continue;
-        REPO_PENDING.set(k, await r.arrayBuffer());
-      } catch (e) {}
-    }
-    await decodePending();
+      const res = await fetchTimeout("data/clips.json?ts=" + Date.now(), 20000);
+      if (res.ok) {
+        const manifest = await res.json();
+        ((manifest && manifest.clips) || []).forEach((c) => {
+          if (c.file) REPO_FILES.set(clipKey(c.section, c.division || "", c.poomsae), c.file);
+        });
+      }
+    } catch (e) {}
+    repoManifestDone = true;
+    repoQueue = Array.from(REPO_FILES.keys());
+    await new Promise((resolve) => {
+      repoIdle.push(resolve);
+      pumpRepo();
+    });
+    clipsChanged();
   };
 
-  // Decode any fetched-but-undecoded repo clips into the cache. Safe to call
-  // repeatedly (decodes only what's still pending). decodeAudioData detaches
-  // its input, so hand it a copy and keep the original for a later retry.
-  async function decodePending() {
-    if (!ctx || !REPO_PENDING.size) return;
-    for (const [k, buf] of Array.from(REPO_PENDING.entries())) {
-      if (CLIP_CACHE.has(k)) {
+  // Decode one fetched repo clip into the cache. decodeAudioData detaches its
+  // input, so hand it a copy and keep the original for a later retry.
+  async function decodeOne(k) {
+    const buf = REPO_PENDING.get(k);
+    if (!ctx || !buf || REPO_DECODING.has(k)) return;
+    if (CLIP_CACHE.has(k)) {
+      REPO_PENDING.delete(k);
+      return;
+    }
+    REPO_DECODING.add(k);
+    try {
+      const decoded = await ctx.decodeAudioData(buf.slice(0));
+      if (!CLIP_CACHE.has(k)) CLIP_CACHE.set(k, decoded); // a local upload that landed meanwhile wins
+      REPO_PENDING.delete(k);
+      clipsChanged();
+    } catch (e) {
+      // iOS can't decode before the first tap unlocks audio — leave it pending
+      // for the unlock. Failing while running means the file itself is bad.
+      if (ctx.state === "running") {
         REPO_PENDING.delete(k);
-        continue;
+        REPO_FAILED.add(k);
+        clipsChanged();
       }
-      try {
-        const decoded = await ctx.decodeAudioData(buf.slice(0));
-        CLIP_CACHE.set(k, decoded);
-        REPO_PENDING.delete(k);
-      } catch (e) {
-        // Still suspended/failed — leave pending; retry on the next unlock.
-      }
+    } finally {
+      REPO_DECODING.delete(k);
     }
   }
+
+  // Decode any fetched-but-undecoded repo clips. Safe to call repeatedly.
+  async function decodePending() {
+    if (!ctx || !REPO_PENDING.size) return;
+    for (const k of Array.from(REPO_PENDING.keys())) await decodeOne(k);
+  }
+
+  // Move clips to the front of the download queue. Newest request wins.
+  function bumpRepo(keys) {
+    keys
+      .slice()
+      .reverse()
+      .forEach((k) => {
+        const i = repoPriority.indexOf(k);
+        if (i !== -1) repoPriority.splice(i, 1);
+        repoPriority.unshift(k);
+      });
+    if (repoPriority.length > 80) repoPriority.length = 80;
+    pumpRepo();
+  }
+  // items: run items ({section, division, id}) in the order they'll play.
+  MT.prioritizeClips = function (items) {
+    const keys = [];
+    (items || []).forEach((it) => {
+      if (!it || !it.section) return;
+      if (MT.matchSpeed(it.section, it.division, it.id)) keys.push(clipKey("black", "u30", it.id));
+      keys.push(clipKey(it.section, it.division || "", it.id));
+    });
+    bumpRepo(keys);
+  };
+  // A whole division — called when a builder screen shows it. Black belt
+  // speed matches play the U30 recording, so that comes along too.
+  MT.prioritizeDivision = function (section, division) {
+    const p = [clipKey(section, division || "", "")];
+    if (section === "black" && division !== "u30") p.push(clipKey("black", "u30", ""));
+    bumpRepo(p);
+  };
+
+  function keyLoading(k) {
+    if (CLIP_CACHE.has(k) || REPO_FAILED.has(k)) return false;
+    if (!repoManifestDone) return true; // don't know yet what's published
+    if (!REPO_FILES.has(k)) return false;
+    if (REPO_PENDING.has(k)) decodeOne(k); // fetched — decode now that it's needed
+    return true;
+  }
+  // True while the audio for (section, division, id) is still on its way. The
+  // run holds on "Loading audio" instead of dropping to the metronome.
+  MT.clipLoading = function (section, division, id) {
+    if (!tempoMapDone) return true; // a speed match could still redirect to U30
+    if (MT.matchSpeed(section, division, id)) {
+      const base = clipKey("black", "u30", id);
+      if (CLIP_CACHE.has(base)) return false;
+      if (keyLoading(base)) return true;
+    }
+    const own = clipKey(section, division || "", id);
+    if (CLIP_CACHE.has(own)) return false;
+    return keyLoading(own);
+  };
+  // True while any published clip is still downloading or waiting to decode.
+  MT.clipsLoading = function () {
+    return !repoManifestDone || REPO_INFLIGHT.size > 0 || repoQueue.length > 0 || REPO_PENDING.size > 0;
+  };
   MT.decodePendingClips = function () {
     decodeVoicePending();
     return decodePending();
@@ -667,7 +883,7 @@
 
   MT.loadTempoMap = async function () {
     try {
-      const res = await fetch("data/tempomap.json?ts=" + Date.now());
+      const res = await fetchTimeout("data/tempomap.json?ts=" + Date.now(), 20000);
       if (!res.ok) return;
       const m = await res.json();
       ((m && m.matches) || []).forEach((c) => {
@@ -691,7 +907,11 @@
         const end = Number(z.end);
         if (id > 0 && end > 0) REPO_INTROS.set(clipKey(z.section, z.division || "", id), end);
       });
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      tempoMapDone = true;
+      clipsChanged();
+    }
   };
   MT.repoTempoSpeed = function (key) {
     return REPO_TEMPO.get(key) || 0;

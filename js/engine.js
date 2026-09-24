@@ -402,6 +402,20 @@
     await wait(2.4, player);
   }
 
+  // The item's recording is still downloading (slow connection, first visit):
+  // hold on "Loading audio" rather than quietly running the metronome. Gives
+  // up after 60s and runs whatever's there — the download keeps going, so a
+  // later rep or poomsae picks it up.
+  async function awaitClip(item, player, cb) {
+    if (!item.section || !MT.clipLoading || !MT.clipLoading(item.section, item.division, item.id)) return;
+    MT.prioritizeClips([item]);
+    cb.onPhase("loading", "Loading audio");
+    const giveUp = Date.now() + 60000;
+    while (!stopped(player) && Date.now() < giveUp && MT.clipLoading(item.section, item.division, item.id)) {
+      await wait(0.25, player);
+    }
+  }
+
   // One full poomsae: [announce] → Joonbi → count → Sijak → clip/metronome →
   // Baro → relax → recovery count. Caller handles onItem and any rest.
   async function runPoomsaeItem(item, player, cb, settings) {
@@ -410,6 +424,8 @@
       await sayName(item, player, settings);
       await wait(GAP, player);
     }
+    if (stopped(player)) return;
+    await awaitClip(item, player, cb);
     if (stopped(player)) return;
     cb.onPhase("joonbi", "Joonbi");
     await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
@@ -471,6 +487,8 @@
           await wait(GAP, player);
         }
         if (player.cancelled) return;
+        await awaitClip(item, player, cb);
+        if (stopped(player)) continue;
         cb.onPhase("joonbi", "Joonbi");
         await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
         if (player.cancelled) return;
@@ -600,6 +618,11 @@
     const player = { cancelled: false, skip: false, paused: false, seek: null, timers: [], waiters: [], bus: MT.createBus() };
     MT._current = player;
     MT.unlockAudio();
+    // This session's recordings jump the download queue, in play order.
+    if (MT.prioritizeClips) {
+      if (session.kind === "mixed") (session.divisions || []).slice().reverse().forEach((d) => MT.prioritizeDivision("black", d));
+      else if (session.items) MT.prioritizeClips(session.items);
+    }
 
     if (session.kind === "drill" || session.kind === "mixed" || session.kind === "count" || session.kind === "pdrill") {
       if (session.kind === "drill") await runDrill(session, player, cb, settings);
