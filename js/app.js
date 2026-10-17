@@ -101,13 +101,13 @@
   })();
 
   /* -------------------- tempo preview --------------------
-     ▶ Preview beside a tempo picker plays 4 beats at the picked speed so
+     ▶ Preview beside a tempo picker plays 5 beats at the picked speed so
      coaches can hear it before starting. Drills tick their chosen sound;
-     Counting speaks the first four counts. The picker already shows the
+     Counting speaks the first five counts. The picker already shows the
      level-adjusted value, so the preview matches the run. One at a time —
      tap again, start the run or leave the screen to stop it; a new speed or
      level restarts it at the new pace. */
-  const PREVIEW_BEATS = 4;
+  const PREVIEW_BEATS = 5;
   let preview = null; // { kind, btn, label, bus, spoken, timers }
   function stopPreview(cut) {
     if (!preview) return;
