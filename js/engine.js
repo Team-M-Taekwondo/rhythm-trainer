@@ -297,11 +297,14 @@
     });
   }
 
-  // Spoken get-ready countdown number (Korean Yuna, native numbers 하나…다섯) in
-  // place of beeps — only 1–5 are voiced. Fire-and-forget so it overlaps the 1s
-  // wait. Speech (not Web Audio) keeps a following spoken cue audible on iOS.
+  // Spoken get-ready countdown number (Korean Yuna, native numbers 둘…다섯) in
+  // place of beeps — only 2–5 are voiced. The "1" second stays on screen but
+  // is silent: 하나 is also the first count, so athletes heard "둘, 하나" and
+  // started early. That silent beat is the pause before the Sijak/Joonbi cue.
+  // Fire-and-forget so it overlaps the 1s wait. Speech (not Web Audio) keeps a
+  // following spoken cue audible on iOS.
   function sayCountdown(r, settings) {
-    if (settings && settings.voice && r >= 1 && r <= 5) {
+    if (settings && settings.voice && r >= 2 && r <= 5) {
       MT.speak(MT.KO_NUMBERS[r - 1]); // Korean Yuna, natural tuning
     }
   }
