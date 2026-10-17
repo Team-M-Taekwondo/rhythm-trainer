@@ -502,7 +502,7 @@
     });
   });
 
-  /* -------------------- PRESET DRILLS (Team Presets) -------------------- */
+  /* -------------------- PRESET DRILLS -------------------- */
   let presetLevel = "black";
   let presetDrill = null; // the preset opened on the config screen
   let presetSound = "drum";
