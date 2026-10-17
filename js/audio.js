@@ -284,10 +284,11 @@
         if (VOICE_CACHE.has(k) || VOICE_PENDING.has(k)) return;
         try {
           const url = "audio/voice/" + k + ".m4a";
+          const viaWorker = workerInControl();
           const r = await fetch(url);
           if (r.ok) {
             const buf = await r.arrayBuffer();
-            stashForOffline(url, buf, r);
+            stashForOffline(url, buf, r, viaWorker);
             VOICE_PENDING.set(k, buf);
           }
         } catch (e) {}
@@ -608,10 +609,14 @@
   // First visit: the service worker isn't in control yet, so it never sees
   // these downloads. Put them in its cache ourselves so the next visit (even
   // offline) doesn't download them again. app.js sets offlineEnabled.
-  function stashForOffline(url, buf, res) {
+  // viaWorker is whether the worker was in control when the request STARTED —
+  // it can take over mid-download, and that download never passed through it.
+  function workerInControl() {
+    return !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  }
+  function stashForOffline(url, buf, res, viaWorker) {
     try {
-      if (!MT.offlineEnabled || !window.caches) return;
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) return;
+      if (!MT.offlineEnabled || !window.caches || viaWorker) return;
       const headers = {};
       ["Content-Type", "ETag", "Last-Modified"].forEach((h) => {
         const v = res.headers.get(h);
@@ -646,6 +651,7 @@
       };
       try {
         arm();
+        const viaWorker = workerInControl();
         const res = await fetch(url, ctl ? { signal: ctl.signal } : undefined);
         if (res.status === 404) throw Object.assign(new Error("missing " + url), { fatal: true });
         if (!res.ok) throw new Error("HTTP " + res.status);
@@ -672,7 +678,7 @@
           clearTimeout(timer);
           buf = await res.arrayBuffer();
         }
-        stashForOffline(url, buf, res);
+        stashForOffline(url, buf, res, viaWorker);
         return buf;
       } catch (e) {
         lastErr = e;

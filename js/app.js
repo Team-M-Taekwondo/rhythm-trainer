@@ -100,8 +100,68 @@
     el.textContent = `Last updated on ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} @ ${h}:${min} ${ap}`;
   })();
 
+  /* -------------------- tempo preview --------------------
+     ▶ Preview beside a tempo picker plays 4 beats at the picked speed so
+     coaches can hear it before starting. Drills tick their chosen sound;
+     Counting speaks the first four counts. The picker already shows the
+     level-adjusted value, so the preview matches the run. One at a time —
+     tap again, start the run or leave the screen to stop it; a new speed or
+     level restarts it at the new pace. */
+  const PREVIEW_BEATS = 4;
+  let preview = null; // { kind, btn, label, bus, spoken, timers }
+  function stopPreview(cut) {
+    if (!preview) return;
+    preview.timers.forEach(clearTimeout);
+    if (preview.bus) {
+      try { preview.bus.disconnect(); } catch (e) {}
+    }
+    if (cut !== false && preview.spoken) MT.cancelSpeech();
+    preview.btn.classList.remove("playing");
+    preview.btn.textContent = preview.label;
+    preview = null;
+  }
+  function previewSettings(kind) {
+    if (kind === "drill") return { interval: Number($("#drill-tempo").value) || 0.8, sound: drillSound };
+    if (kind === "preset") return { interval: Number($("#preset-tempo").value) || 0.8, sound: presetSound };
+    return { interval: countInterval, sound: null }; // counting: spoken counts
+  }
+  function startPreview(btn) {
+    stopPreview();
+    MT.unlockAudio();
+    const kind = btn.dataset.preview;
+    const { interval, sound } = previewSettings(kind);
+    const p = { kind, btn, label: btn.textContent, bus: null, spoken: !sound, timers: [] };
+    preview = p;
+    btn.classList.add("playing");
+    btn.textContent = "■ Stop";
+    if (sound) {
+      p.bus = MT.createBus(); // disconnecting it silences already-scheduled hits
+      const t0 = MT.now() + 0.05;
+      for (let i = 0; i < PREVIEW_BEATS; i++) MT.playSound(sound, t0 + i * interval, false, p.bus);
+    } else {
+      for (let i = 0; i < PREVIEW_BEATS; i++) {
+        p.timers.push(setTimeout(() => MT.speak(MT.countWord(i + 1), { rate: 1.0 }), i * interval * 1000));
+      }
+    }
+    // Reset the button once the last beat has rung out (don't cut its tail).
+    p.timers.push(setTimeout(() => {
+      if (preview === p) stopPreview(false);
+    }, ((PREVIEW_BEATS - 1) * interval + 0.8) * 1000));
+  }
+  // Speed or level changed: if that screen's preview is playing, replay it.
+  function refreshPreview(kind) {
+    if (preview && preview.kind === kind) startPreview(preview.btn);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-preview]");
+    if (!btn) return;
+    if (preview && preview.btn === btn) stopPreview();
+    else startPreview(btn);
+  });
+
   /* -------------------- screen routing -------------------- */
   function show(name) {
+    stopPreview(); // leaving a screen (or starting a run) ends any preview
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
     window.scrollTo(0, 0);
   }
@@ -402,7 +462,10 @@
     el.textContent = "Est. total: ~" + MT.fmtTime(t);
   }
   $("#drill-reps").addEventListener("input", updateDrillEst);
-  $("#drill-tempo").addEventListener("change", updateDrillEst);
+  $("#drill-tempo").addEventListener("change", () => {
+    updateDrillEst();
+    refreshPreview("drill");
+  });
   $("#drill-hold").addEventListener("change", updateDrillEst);
   $("#drill-sets").addEventListener("input", updateDrillEst);
   $("#drill-rest").addEventListener("input", updateDrillEst);
@@ -620,7 +683,10 @@
     });
     el.textContent = "Est. total: ~" + MT.fmtTime(t);
   }
-  $("#preset-tempo").addEventListener("change", updatePresetEst);
+  $("#preset-tempo").addEventListener("change", () => {
+    updatePresetEst();
+    refreshPreview("preset");
+  });
   $("#preset-hold").addEventListener("change", updatePresetEst);
   $("#preset-reps").addEventListener("input", updatePresetEst);
   $("#preset-sets").addEventListener("input", updatePresetEst);
@@ -633,6 +699,7 @@
     renderLevelSeg("#preset-cfg-level");
     $("#preset-tempo").value = levelTempo(presetDrill.tempo);
     updatePresetEst();
+    refreshPreview("preset");
   });
   $("#start-preset").addEventListener("click", () => {
     if (!presetDrill) return;
@@ -714,6 +781,7 @@
     renderCountLevelSeg();
     renderCountChips();
     updateCountEst();
+    refreshPreview("count");
   });
   $("#count-intervals").addEventListener("click", (e) => {
     const chip = e.target.closest("[data-int]");
@@ -722,11 +790,13 @@
     renderCountChips();
     $("#count-custom").value = countInterval;
     updateCountEst();
+    refreshPreview("count");
   });
   $("#count-custom").addEventListener("change", (e) => {
     countInterval = Number(e.target.value);
     renderCountChips(); // active chip follows only if it matches a preset
     updateCountEst();
+    refreshPreview("count");
   });
   $("#start-count").addEventListener("click", () => {
     MT.unlockAudio();
