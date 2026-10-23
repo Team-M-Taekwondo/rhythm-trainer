@@ -200,13 +200,7 @@
         if (cur && cur.dataset.screen === "drills") presetGroup = null;
         renderPresetList();
       }
-      if (dest === "build-count") {
-        // Reachable from Home, the Drills hub and the tab bar — the back arrow
-        // returns to the Drills hub only when that's where you came from.
-        const cur = document.querySelector(".screen.active");
-        setBackButton("build-count", cur && cur.dataset.screen === "drills" ? "drills" : "home");
-        renderCountBuilder();
-      }
+      if (dest === "build-count") renderCountBuilder();
       if (dest === "randomizer") renderRandomizer();
       if (dest === "build-pdrill") {
         // The list depends on decoded audio — this tap is a user gesture, so
