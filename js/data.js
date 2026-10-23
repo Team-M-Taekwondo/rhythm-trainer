@@ -67,7 +67,9 @@
      Every drill ends the same way: no rest after the last set, just the
      finish chime — that's how athletes know the cycle is over.
      kick: true shows the kick-hold option on the config screen.
-     pooms splits Standing drills into a Single/Multiple Pooms chooser. */
+     pooms splits Standing drills into a Single/Multiple Pooms chooser, and
+     stance groups the rows under a stance heading inside each. The full
+     drill name (shown on the config and run screens) is stance + name. */
   MT.PRESET_LEVELS = [
     { id: "comp", label: "Comp. Black", delta: -0.1 },
     { id: "black", label: "Black Belts", delta: 0 },
@@ -77,12 +79,14 @@
     { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
     { id: "round",  group: "Ground drills",   name: "Round House Kicks", tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
     { id: "side",   group: "Ground drills",   name: "Side Kicks",        tempo: 1.1, reps: 15, rest: 10, sets: 4, kick: true },
-    { id: "horse",  group: "Standing drills", pooms: "single", name: "Horse Stance · Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
-    { id: "inplace", group: "Standing drills", pooms: "single", name: "Single Stances · In Place · Blocks/Attacks",  tempo: 1.0, reps: 20, rest: 10, sets: 4 },
-    { id: "udblock", group: "Standing drills", pooms: "single", name: "Single Stances · Forward/Back · Blocks",      tempo: 1.5, reps: 20, rest: 10, sets: 4 },
-    { id: "udattack", group: "Standing drills", pooms: "single", name: "Single Stances · Forward/Back · Attacks",    tempo: 1.4, reps: 20, rest: 10, sets: 4 },
-    { id: "fb2poom", group: "Standing drills", pooms: "multiple", name: "Single Stances · Forward/Back · 2 Pooms",   tempo: 1.9, reps: 20, rest: 10, sets: 4 },
+    { id: "horse",  group: "Standing drills", pooms: "single", stance: "Horse Stance", name: "Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "inplace", group: "Standing drills", pooms: "single", stance: "Front Stance", name: "In Place · Blocks/Attacks",    tempo: 1.0, reps: 20, rest: 10, sets: 4 },
+    { id: "udblock", group: "Standing drills", pooms: "single", stance: "Front Stance", name: "Forward/Back · Blocks",        tempo: 1.5, reps: 20, rest: 10, sets: 4 },
+    { id: "udattack", group: "Standing drills", pooms: "single", stance: "Front Stance", name: "Forward/Back · Attacks",      tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "fb2poom", group: "Standing drills", pooms: "multiple", stance: "Front Stance", name: "Forward/Back · 2 Pooms",     tempo: 1.9, reps: 20, rest: 10, sets: 4 },
   ];
+  // Full drill name — "Front Stance · Forward/Back · Blocks".
+  MT.presetName = (d) => (d.stance ? d.stance + " · " + d.name : d.name);
 
   /* Counting-drill levels. Interval presets are stored at the COMPETITION
      BLACK BELT reference tempo; the other levels add a fixed amount:

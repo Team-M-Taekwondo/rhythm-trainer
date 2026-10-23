@@ -160,9 +160,18 @@
   });
 
   /* -------------------- screen routing -------------------- */
+  // Which bottom tab lights up for each screen.
+  const TAB_FOR = {
+    home: "home",
+    "poomsae-hub": "poomsae", "build-forms": "poomsae", "build-pdrill": "poomsae",
+    drills: "drills", "build-drill": "drills", "preset-drills": "drills", "preset-config": "drills",
+    "build-count": "count",
+    randomizer: "random",
+  };
   function show(name) {
     stopPreview(); // leaving a screen (or starting a run) ends any preview
     $$(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
+    $$("#tabbar .tab").forEach((t) => t.classList.toggle("active", TAB_FOR[name] === t.dataset.tab));
     window.scrollTo(0, 0);
   }
   // Point a screen's back arrow at a different screen when a config screen
@@ -191,7 +200,13 @@
         if (cur && cur.dataset.screen === "drills") presetGroup = null;
         renderPresetList();
       }
-      if (dest === "build-count") renderCountBuilder();
+      if (dest === "build-count") {
+        // Reachable from Home, the Drills hub and the tab bar — the back arrow
+        // returns to the Drills hub only when that's where you came from.
+        const cur = document.querySelector(".screen.active");
+        setBackButton("build-count", cur && cur.dataset.screen === "drills" ? "drills" : "home");
+        renderCountBuilder();
+      }
       if (dest === "randomizer") renderRandomizer();
       if (dest === "build-pdrill") {
         // The list depends on decoded audio — this tap is a user gesture, so
@@ -224,6 +239,60 @@
     ).join("");
     sel.value = value || 0;
   }
+
+  /* -------------------- random-draw pool --------------------
+     "Random from range" lists every poomsae in the range as a chip — tap one
+     to leave it out of the draw (say, skip Pal Jang but keep 1–7 and Koryo).
+     Exclusions are remembered per builder, so moving the range doesn't
+     reset them. prefix is "rand" (Full Poomsae) or "pdrill-rand" (Intro). */
+  const poolExcluded = { rand: new Set(), "pdrill-rand": new Set() };
+  function poolForms(prefix) {
+    const list = prefix === "rand" ? sectionForms(formsSection, formsDivision) : pdrillForms();
+    const from = Number($(`#${prefix}-from`).value);
+    const to = Number($(`#${prefix}-to`).value);
+    return list.filter((f) => f.id >= from && f.id <= to);
+  }
+  // Poomsae still in the draw after the coach's exclusions.
+  function poolActive(prefix) {
+    const ex = poolExcluded[prefix];
+    return poolForms(prefix).filter((f) => !ex.has(f.id));
+  }
+  const shortName = (f) => f.name.replace(/^Taegeuk /, "");
+  function renderPool(prefix) {
+    const ex = poolExcluded[prefix];
+    const list = poolForms(prefix);
+    $(`#${prefix}-pool`).innerHTML = list
+      .map(
+        (f) =>
+          `<button type="button" class="pool-chip ${ex.has(f.id) ? "" : "active"}" data-pool-id="${f.id}" aria-pressed="${!ex.has(f.id)}">${f.id} · ${shortName(f)}</button>`
+      )
+      .join("");
+    const on = list.filter((f) => !ex.has(f.id)).length;
+    $(`#${prefix}-pool-count`).textContent = list.length ? `${on} of ${list.length}` : "";
+  }
+  document.addEventListener("click", (e) => {
+    const all = e.target.closest("[data-pool-all]");
+    const none = e.target.closest("[data-pool-none]");
+    const chip = e.target.closest("[data-pool-id]");
+    if (!all && !none && !chip) return;
+    const prefix = all
+      ? all.dataset.poolAll
+      : none
+      ? none.dataset.poolNone
+      : chip.closest(".pool-chips").id.replace(/-pool$/, "");
+    const ex = poolExcluded[prefix];
+    if (all) poolForms(prefix).forEach((f) => ex.delete(f.id));
+    else if (none) poolForms(prefix).forEach((f) => ex.add(f.id));
+    else {
+      const id = Number(chip.dataset.poolId);
+      if (ex.has(id)) ex.delete(id);
+      else ex.add(id);
+    }
+    renderPool(prefix);
+    if (prefix === "rand") updateFormsEst();
+    else updatePdrillEst();
+  });
+
   /* -------------------- FORMS builder -------------------- */
   let formsSection = "black";
   let formsDivision = "cadet";
@@ -287,9 +356,13 @@
       const from = Number($("#rand-from").value);
       const to = Number($("#rand-to").value);
       const count = Math.max(1, Number($("#rand-count").value) || 1);
-      const pool = sectionForms(formsSection, formsDivision).filter((f) => f.id >= from && f.id <= to);
-      if (from > to || !pool.length) {
+      const pool = poolActive("rand");
+      if (from > to) {
         el.textContent = "";
+        return;
+      }
+      if (!pool.length) {
+        el.textContent = "Include at least one poomsae in the draw.";
         return;
       }
       // Random draw — average the pool, since each poomsae runs a different length.
@@ -352,6 +425,7 @@
     $("#rand-to").innerHTML = opts;
     $("#rand-from").value = secForms[0].id;
     $("#rand-to").value = secForms[secForms.length - 1].id;
+    renderPool("rand");
     updateFormsEst();
   }
   $$("#forms-section .seg-btn").forEach((btn) =>
@@ -379,8 +453,12 @@
   // Keep the total-time line live as the selection changes.
   $("#forms-checklist").addEventListener("change", updateFormsEst);
   $("#forms-rest").addEventListener("input", updateFormsEst);
-  $("#rand-from").addEventListener("change", updateFormsEst);
-  $("#rand-to").addEventListener("change", updateFormsEst);
+  const onRandRange = () => {
+    renderPool("rand");
+    updateFormsEst();
+  };
+  $("#rand-from").addEventListener("change", onRandRange);
+  $("#rand-to").addEventListener("change", onRandRange);
   $("#rand-count").addEventListener("input", updateFormsEst);
   $("#mixed-divisions").addEventListener("change", updateFormsEst);
   $("#mixed-rounds").addEventListener("input", updateFormsEst);
@@ -414,10 +492,12 @@
       const from = Number($("#rand-from").value);
       const to = Number($("#rand-to").value);
       if (from > to) return alert("'From' must be ≤ 'To'.");
+      if (!poolActive("rand").length) return alert("Include at least one poomsae in the draw.");
       config = {
         mode: "random",
         from,
         to,
+        exclude: Array.from(poolExcluded.rand),
         count: Math.max(1, Number($("#rand-count").value) || 1),
         noRepeat: $("#rand-norepeat").checked,
       };
@@ -538,7 +618,7 @@
   function presetEstimate(d, tempo) {
     return MT.estimateSession({
       kind: "drill",
-      items: [MT.drillToItem({ name: d.name, reps: d.reps, duration: tempo, sound: "drum" })],
+      items: [MT.drillToItem({ name: MT.presetName(d), reps: d.reps, duration: tempo, sound: "drum" })],
       sets: d.sets,
       restSeconds: d.rest,
     });
@@ -583,14 +663,28 @@
               <button class="seg-btn ${standingPooms === "multiple" ? "active" : ""}" data-pooms="multiple">Multiple Pooms</button>
             </div>`
           : "";
-        const rows = drills.length
-          ? drills
-              .map(
-                (d) => `
+        const row = (d) => `
             <button class="preset-row" data-preset="${d.id}">
               <span class="pr-name">${d.name}</span>
               <span class="pr-meta">${levelTempo(d.tempo).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest · ~${MT.fmtTime(presetEstimate(d, levelTempo(d.tempo)))}</span>
-            </button>`
+            </button>`;
+        // Rows sit under a stance heading (Horse Stance, Front Stance…) so the
+        // right drill is quick to find; drills without a stance list plainly.
+        const stances = [];
+        drills.forEach((d) => {
+          const key = d.stance || "";
+          let s = stances.find((x) => x.name === key);
+          if (!s) stances.push((s = { name: key, drills: [] }));
+          s.drills.push(d);
+        });
+        const rows = drills.length
+          ? stances
+              .map(
+                (s) => `
+            <div class="stance-group">
+              ${s.name ? `<h3 class="stance-head">${s.name}</h3>` : ""}
+              <div class="checklist">${s.drills.map(row).join("")}</div>
+            </div>`
               )
               .join("")
           : `<p class="hint">No drills here yet.</p>`;
@@ -598,7 +692,7 @@
       <div class="panel">
         <h2>${g.name}</h2>
         ${poomsSeg}
-        <div class="checklist">${rows}</div>
+        ${rows}
       </div>`;
       })
       .join("");
@@ -645,7 +739,7 @@
     opts = opts || {};
     presetDrill = d;
     presetRunName = opts.title || null;
-    $("#preset-title").textContent = opts.title || d.name;
+    $("#preset-title").textContent = opts.title || MT.presetName(d);
     renderLevelSeg("#preset-cfg-level");
     fillTempoSelect($("#preset-tempo"), opts.tempo != null ? opts.tempo : levelTempo(d.tempo), "", MT.DRILL_TEMPOS);
     renderPresetSoundChips();
@@ -671,7 +765,7 @@
       kind: "drill",
       items: [
         MT.drillToItem({
-          name: presetRunName || presetDrill.name,
+          name: presetRunName || MT.presetName(presetDrill),
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: Number($("#preset-tempo").value) || levelTempo(presetDrill.tempo),
           hold: presetHold(),
@@ -711,7 +805,7 @@
       kind: "drill",
       items: [
         MT.drillToItem({
-          name: presetRunName || presetDrill.name,
+          name: presetRunName || MT.presetName(presetDrill),
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
           duration: tempo,
           hold: presetHold(),
@@ -865,6 +959,7 @@
       $("#pdrill-rand-from").value = list[0].id;
       $("#pdrill-rand-to").value = list[list.length - 1].id;
     }
+    renderPool("pdrill-rand");
     updatePdrillEst();
   }
 
@@ -878,9 +973,13 @@
       const from = Number($("#pdrill-rand-from").value);
       const to = Number($("#pdrill-rand-to").value);
       const count = Math.max(1, Number($("#pdrill-rand-count").value) || 1);
-      const pool = pdrillForms().filter((f) => f.id >= from && f.id <= to);
-      if (from > to || !pool.length) {
+      const pool = poolActive("pdrill-rand");
+      if (from > to) {
         el.textContent = "";
+        return;
+      }
+      if (!pool.length) {
+        el.textContent = "Include at least one poomsae in the draw.";
         return;
       }
       // Random draw — average the pool, since each intro runs a different
@@ -927,8 +1026,12 @@
     })
   );
   $("#pdrill-checklist").addEventListener("change", updatePdrillEst);
-  $("#pdrill-rand-from").addEventListener("change", updatePdrillEst);
-  $("#pdrill-rand-to").addEventListener("change", updatePdrillEst);
+  const onPdrillRange = () => {
+    renderPool("pdrill-rand");
+    updatePdrillEst();
+  };
+  $("#pdrill-rand-from").addEventListener("change", onPdrillRange);
+  $("#pdrill-rand-to").addEventListener("change", onPdrillRange);
   $("#pdrill-rand-count").addEventListener("input", updatePdrillEst);
   $("#pdrill-reps").addEventListener("input", updatePdrillEst);
   $("#pdrill-rest").addEventListener("input", updatePdrillEst);
@@ -948,8 +1051,8 @@
       const from = Number($("#pdrill-rand-from").value);
       const to = Number($("#pdrill-rand-to").value);
       if (from > to) return alert("'From' must be ≤ 'To'.");
-      const pool = pdrillForms().filter((f) => f.id >= from && f.id <= to);
-      if (!pool.length) return alert("No poomsae with an intro set up in that range.");
+      const pool = poolActive("pdrill-rand");
+      if (!pool.length) return alert("Include at least one poomsae with an intro set up.");
       const count = Math.max(1, Number($("#pdrill-rand-count").value) || 1);
       const noRepeat = $("#pdrill-rand-norepeat").checked;
       picked = [];
@@ -2257,8 +2360,14 @@
     else if (name === "preset-config") updatePresetEst();
     else if (name === "build-pdrill") renderPdrillBuilder();
     restore();
-    if (name === "build-forms") updateFormsEst();
-    else if (name === "build-pdrill") updatePdrillEst();
+    // The range dropdowns were just put back — redraw the include chips for it.
+    if (name === "build-forms") {
+      renderPool("rand");
+      updateFormsEst();
+    } else if (name === "build-pdrill") {
+      renderPool("pdrill-rand");
+      updatePdrillEst();
+    }
   }
   // Clips now land one by one, so a refresh can happen while someone is
   // picking poomsae. Snapshot the ticked boxes and dropdowns on screen and put

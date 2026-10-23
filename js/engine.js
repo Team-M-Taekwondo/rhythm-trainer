@@ -823,8 +823,12 @@
     if (config.mode === "pick") {
       return config.ids.map((id) => mk(forms.find((x) => x.id === id)));
     }
-    // random from range [from, to], draw `count`
-    const pool = forms.filter((f) => f.id >= config.from && f.id <= config.to);
+    // random from range [from, to], draw `count`. config.exclude (optional)
+    // lists poomsae ids the coach unticked inside the range.
+    const skip = config.exclude || [];
+    const pool = forms.filter(
+      (f) => f.id >= config.from && f.id <= config.to && skip.indexOf(f.id) === -1
+    );
     const drawn = [];
     let bag = [];
     for (let i = 0; i < config.count; i++) {

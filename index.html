@@ -10,11 +10,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=107" />
+  <link rel="stylesheet" href="css/styles.css?v=108" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=107" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=107" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=108" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=108" />
 </head>
 <body>
   <div id="app">
@@ -37,6 +37,11 @@
           <span class="card-kicker">TKD Drills Rhythm Trainer</span>
           <span class="card-title">Select Drills</span>
           <span class="card-sub">Custom drills, preset drills &amp; general counting</span>
+        </button>
+        <button class="card big" data-goto="build-count">
+          <span class="card-kicker">Korean Counting</span>
+          <span class="card-title">General Counting</span>
+          <span class="card-sub">The app counts out loud while the coach calls the drill</span>
         </button>
         <button class="card big" data-goto="randomizer">
           <span class="card-kicker">Poomsae Randomizer</span>
@@ -119,9 +124,19 @@
             <span>To poomsae #</span>
             <select id="rand-to"></select>
           </label>
+          <div class="field">
+            <div class="pool-head">
+              <span>Include in the draw <b id="rand-pool-count"></b></span>
+              <span class="pool-actions">
+                <button type="button" class="link-btn" data-pool-all="rand">All</button>
+                <button type="button" class="link-btn" data-pool-none="rand">None</button>
+              </span>
+            </div>
+            <div id="rand-pool" class="pool-chips"></div>
+          </div>
           <label class="field">
             <span>How many to draw</span>
-            <input type="number" id="rand-count" min="1" max="15" value="5" />
+            <input type="number" inputmode="numeric" id="rand-count" min="1" max="15" value="5" />
           </label>
           <label class="check-row">
             <input type="checkbox" id="rand-norepeat" checked />
@@ -135,7 +150,7 @@
         <h2>2 &middot; Rest</h2>
         <label class="field">
           <span>Rest between poomsae (seconds)</span>
-          <input type="number" id="forms-rest" min="0" max="120" value="10" />
+          <input type="number" inputmode="numeric" id="forms-rest" min="0" max="120" value="10" />
         </label>
       </div>
 
@@ -148,11 +163,11 @@
         </div>
         <label class="field">
           <span>Number of rounds (1 division each)</span>
-          <input type="number" id="mixed-rounds" min="1" max="60" value="8" />
+          <input type="number" inputmode="numeric" id="mixed-rounds" min="1" max="60" value="8" />
         </label>
         <label class="field">
           <span>Switch time between rounds (seconds)</span>
-          <input type="number" id="mixed-switch" min="0" max="120" value="10" />
+          <input type="number" inputmode="numeric" id="mixed-switch" min="0" max="120" value="10" />
         </label>
       </div>
 
@@ -231,9 +246,19 @@
             <span>To poomsae #</span>
             <select id="pdrill-rand-to"></select>
           </label>
+          <div class="field">
+            <div class="pool-head">
+              <span>Include in the draw <b id="pdrill-rand-pool-count"></b></span>
+              <span class="pool-actions">
+                <button type="button" class="link-btn" data-pool-all="pdrill-rand">All</button>
+                <button type="button" class="link-btn" data-pool-none="pdrill-rand">None</button>
+              </span>
+            </div>
+            <div id="pdrill-rand-pool" class="pool-chips"></div>
+          </div>
           <label class="field">
             <span>How many to draw</span>
-            <input type="number" id="pdrill-rand-count" min="1" max="15" value="3" />
+            <input type="number" inputmode="numeric" id="pdrill-rand-count" min="1" max="15" value="3" />
           </label>
           <label class="check-row">
             <input type="checkbox" id="pdrill-rand-norepeat" checked />
@@ -247,11 +272,11 @@
         <h2>2 &middot; Reps &amp; rest</h2>
         <label class="field">
           <span>Reps per poomsae</span>
-          <input type="number" id="pdrill-reps" min="1" max="20" value="3" />
+          <input type="number" inputmode="numeric" id="pdrill-reps" min="1" max="20" value="3" />
         </label>
         <label class="field">
           <span>Rest between reps (seconds)</span>
-          <input type="number" id="pdrill-rest" min="0" max="120" value="10" />
+          <input type="number" inputmode="numeric" id="pdrill-rest" min="0" max="120" value="10" />
         </label>
       </div>
 
@@ -301,19 +326,19 @@
         </div>
         <label class="field">
           <span>Reps per set</span>
-          <input type="number" id="preset-reps" min="1" max="200" />
+          <input type="number" inputmode="numeric" id="preset-reps" min="1" max="200" />
         </label>
         <label class="field">
           <span>Sets per round</span>
-          <input type="number" id="preset-sets" min="1" max="20" />
+          <input type="number" inputmode="numeric" id="preset-sets" min="1" max="20" />
         </label>
         <label class="field">
           <span>Rest between sets (seconds)</span>
-          <input type="number" id="preset-rest" min="0" max="120" />
+          <input type="number" inputmode="numeric" id="preset-rest" min="0" max="120" />
         </label>
         <label class="field">
           <span>Rounds (1 round = all sets once)</span>
-          <input type="number" id="preset-rounds" min="1" max="10" value="1" />
+          <input type="number" inputmode="numeric" id="preset-rounds" min="1" max="10" value="1" />
         </label>
       </div>
       <p class="est-line" id="preset-est"></p>
@@ -333,7 +358,7 @@
       <div class="panel">
         <label class="field">
           <span>Count up to</span>
-          <input type="number" id="count-target" min="1" max="200" value="10" />
+          <input type="number" inputmode="numeric" id="count-target" min="1" max="200" value="10" />
         </label>
         <div class="field">
           <span>Seconds between counts</span>
@@ -351,12 +376,12 @@
         <h2>Sets &amp; rest</h2>
         <label class="field">
           <span>Number of sets</span>
-          <input type="number" id="count-sets" min="1" max="20" value="2" />
+          <input type="number" inputmode="numeric" id="count-sets" min="1" max="20" value="2" />
         </label>
         <p class="hint">1 set = one full count up to the number above.</p>
         <label class="field">
           <span>Rest between sets (seconds)</span>
-          <input type="number" id="count-rest" min="0" max="120" value="10" />
+          <input type="number" inputmode="numeric" id="count-rest" min="0" max="120" value="10" />
         </label>
       </div>
       <p class="est-line" id="count-est"></p>
@@ -373,7 +398,7 @@
       <div class="panel">
         <label class="field">
           <span>Reps per set</span>
-          <input type="number" id="drill-reps" min="1" max="200" value="10" />
+          <input type="number" inputmode="numeric" id="drill-reps" min="1" max="200" value="10" />
         </label>
         <div class="field">
           <span>Tempo per rep (seconds)</span>
@@ -396,11 +421,11 @@
         <h2>Sets &amp; rest</h2>
         <label class="field">
           <span>Number of sets</span>
-          <input type="number" id="drill-sets" min="1" max="20" value="3" />
+          <input type="number" inputmode="numeric" id="drill-sets" min="1" max="20" value="3" />
         </label>
         <label class="field">
           <span>Rest between sets (seconds)</span>
-          <input type="number" id="drill-rest" min="0" max="120" value="15" />
+          <input type="number" inputmode="numeric" id="drill-rest" min="0" max="120" value="15" />
         </label>
       </div>
 
@@ -558,7 +583,7 @@
         <p class="hint" id="intro-status"></p>
         <label class="field">
           <span>Drill ends at (seconds into the recording)</span>
-          <input type="number" id="intro-end" inputmode="decimal" step="0.1" min="0" />
+          <input type="number" inputmode="decimal" id="intro-end" step="0.1" min="0" />
         </label>
         <div class="vp-buttons">
           <button class="btn ghost" id="intro-mark">Set from playhead</button>
@@ -601,7 +626,7 @@
         </label>
         <label class="field">
           <span>Count-in beat length (seconds)</span>
-          <input type="number" id="set-countbeat" min="0.5" max="2" step="0.1" value="1" />
+          <input type="number" inputmode="decimal" id="set-countbeat" min="0.5" max="2" step="0.1" value="1" />
         </label>
         <button class="btn" id="set-testvoice">Test voice</button>
         <p class="hint" id="voice-hint">Uses the device's built-in Korean speech. <b>Biggest quality boost:</b> install the enhanced Korean voice — on iPhone/iPad/Mac, Settings → Accessibility → Spoken Content → Voices → Korean → download <b>Yuna</b>, then pick it above.</p>
@@ -616,10 +641,35 @@
     </section>
   </div>
 
+  <!-- Bottom tab bar — one tap to any section from anywhere. Hidden while a
+       session runs (body.running) so the gym view stays clean. -->
+  <nav class="tabbar" id="tabbar" aria-label="Sections">
+    <button class="tab active" data-goto="home" data-tab="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="tab" data-goto="poomsae-hub" data-tab="poomsae">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v6"/><path d="M7 10l5-1 5 1"/><path d="M12 13l-3.5 7"/><path d="M12 13l3.5 7"/></svg>
+      <span>Poomsae</span>
+    </button>
+    <button class="tab" data-goto="drills" data-tab="drills">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8v8"/><path d="M3 10v4"/><path d="M18 8v8"/><path d="M21 10v4"/><path d="M6 12h12"/></svg>
+      <span>Drills</span>
+    </button>
+    <button class="tab" data-goto="build-count" data-tab="count">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 7 20"/><path d="M17 4l-2 16"/><path d="M4 9h16"/><path d="M3 15h16"/></svg>
+      <span>Counting</span>
+    </button>
+    <button class="tab" data-goto="randomizer" data-tab="random">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="16" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="8" cy="16" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/></svg>
+      <span>Random</span>
+    </button>
+  </nav>
+
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=107"></script>
-  <script src="js/audio.js?v=107"></script>
-  <script src="js/engine.js?v=107"></script>
-  <script src="js/app.js?v=107"></script>
+  <script src="js/data.js?v=108"></script>
+  <script src="js/audio.js?v=108"></script>
+  <script src="js/engine.js?v=108"></script>
+  <script src="js/app.js?v=108"></script>
 </body>
 </html>

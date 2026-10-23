@@ -24,6 +24,7 @@
   --pad: clamp(16px, 4vw, 28px);
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: 62px; /* bottom tab bar, excluding the safe area */
 }
 
 * { box-sizing: border-box; }
@@ -56,7 +57,7 @@ button { font-family: inherit; touch-action: manipulation; }
   display: none;
   padding: var(--pad);
   padding-top: calc(var(--pad) + var(--sat));
-  padding-bottom: calc(96px + var(--sab));
+  padding-bottom: calc(24px + var(--tabbar-h) + var(--sab));
 }
 .screen.active { display: block; animation: screen-in 0.28s cubic-bezier(0.25, 0.9, 0.3, 1); }
 .screen.run.active { display: flex; }
@@ -69,7 +70,7 @@ button { font-family: inherit; touch-action: manipulation; }
 }
 
 /* -------- brand / home -------- */
-.brand { text-align: center; padding: 28px 0 8px; }
+.brand { text-align: center; padding: 20px 0 4px; }
 /* Renders a black-on-white logo PNG as clean white on the dark UI —
    no image editing needed. Fallback SVG is already white, so it opts out. */
 .logo { width: min(60vw, 280px); height: auto; filter: invert(1); mix-blend-mode: screen; }
@@ -207,7 +208,38 @@ select {
 .ci-name { flex: 1; font-size: 15px; font-weight: 500; }
 .ci-meta { color: var(--muted); font-size: 12px; }
 
+/* -------- random-draw pool (include / exclude chips) -------- */
+.pool-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 13px; color: var(--muted); font-weight: 500;
+}
+.pool-head b { color: var(--gold-soft); font-weight: 700; margin-left: 4px; }
+.pool-actions { display: flex; gap: 4px; }
+.link-btn {
+  background: transparent; border: 1px solid var(--line); color: var(--text);
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 650; cursor: pointer;
+}
+.link-btn:active { background: rgba(255, 255, 255, 0.08); }
+.pool-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pool-chip {
+  padding: 9px 13px; border-radius: 999px; cursor: pointer; font-size: 13.5px; font-weight: 600;
+  background: transparent; color: var(--muted); border: 1px dashed var(--line-strong);
+  text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, 0.35);
+  transition: transform 0.1s ease, background 0.15s ease, color 0.15s ease;
+}
+.pool-chip:active { transform: scale(0.95); }
+.pool-chip.active {
+  background: rgba(231, 177, 10, 0.14); color: var(--gold-soft);
+  border: 1px solid rgba(231, 177, 10, 0.6); text-decoration: none;
+}
+
 /* -------- preset drill rows -------- */
+.stance-group + .stance-group { margin-top: 16px; }
+.stance-head {
+  margin: 0 0 8px 2px; font-size: 13px; font-weight: 750; color: var(--gold-soft);
+  letter-spacing: 0.02em;
+}
+.stance-head::before { content: "▸ "; color: var(--gold); }
 .preset-row {
   position: relative;
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
@@ -243,7 +275,7 @@ select {
   font-variant-numeric: tabular-nums; margin: 2px 0 12px; min-height: 1em;
 }
 .start-btn {
-  position: sticky; bottom: calc(16px + var(--sab)); z-index: 15;
+  position: sticky; bottom: calc(12px + var(--tabbar-h) + var(--sab)); z-index: 15;
   width: 100%; padding: 18px; font-size: 17px; font-weight: 800; letter-spacing: 0.01em;
   background: linear-gradient(180deg, var(--gold-soft), var(--gold));
   color: #000; border: none; border-radius: 999px; cursor: pointer;
@@ -315,6 +347,39 @@ select {
 }
 .rz-name { font-size: clamp(22px, 6vw, 36px); font-weight: 800; margin-top: 8px; }
 .rz-result.rz-pop { animation: pop 0.32s ease; }
+
+/* ============================================================
+   BOTTOM TAB BAR
+   Fixed to the bottom like a native app; one tap to any section.
+   ============================================================ */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: flex; justify-content: center; gap: 2px;
+  max-width: 720px; margin: 0 auto;
+  height: calc(var(--tabbar-h) + var(--sab));
+  padding: 6px 6px calc(4px + var(--sab));
+  background: rgba(13, 13, 16, 0.86);
+  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(22px);
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 720px) {
+  .tabbar { border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-radius: 18px 18px 0 0; }
+}
+.tab {
+  flex: 1; min-width: 0; border: none; background: transparent; color: var(--muted);
+  border-radius: 14px; padding: 6px 2px 4px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-size: 10.5px; font-weight: 650; letter-spacing: 0.02em;
+  transition: color 0.15s ease, transform 0.12s ease;
+}
+.tab svg { width: 23px; height: 23px; }
+.tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tab:active { transform: scale(0.92); }
+.tab.active { color: var(--gold); }
+.tab.active svg { filter: drop-shadow(0 0 8px rgba(231, 177, 10, 0.45)); }
+/* Gym mode: no tab bar during a run. */
+body.running .tabbar { display: none; }
 
 /* ============================================================
    RUN SCREEN — gym mode
