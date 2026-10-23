@@ -1,30 +1,40 @@
 /* ============================================================
    MTEAM Tempo Trainer — styles
-   Black + gold, native-app feel. Works as a browser page on
-   laptops and as a home-screen web app on phones (safe areas,
+   Black + gold, iOS "liquid glass" feel. Surfaces are frosted,
+   translucent panes floating over a softly lit background, with a
+   specular edge along the top of every pane. Works as a browser page
+   on laptops and as a home-screen web app on phones (safe areas,
    no text selection, no tap flashes, springy press states).
    ============================================================ */
 :root {
-  --bg: #09090b;
-  --bg-2: #131318;
-  --panel: rgba(255, 255, 255, 0.045);
+  --bg: #050507;
+  --bg-2: rgba(255, 255, 255, 0.06);
+  --panel: rgba(255, 255, 255, 0.065);
   --panel-solid: #17171d;
-  --panel-2: #22222b;
-  --line: rgba(255, 255, 255, 0.09);
-  --line-strong: rgba(255, 255, 255, 0.16);
+  --panel-2: rgba(255, 255, 255, 0.1);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.2);
   --text: #f5f5f7;
-  --muted: #9c9cab;
+  --muted: #a3a3b2;
   --gold: #e7b10a;
   --gold-soft: #f4cf5e;
   --go: #34c76b;
   --stop: #e5484d;
   --tension: #4aa8ff;
-  --radius: 20px;
-  --radius-sm: 13px;
+  --radius: 28px;
+  --radius-sm: 16px;
   --pad: clamp(16px, 4vw, 28px);
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
-  --tabbar-h: 62px; /* bottom tab bar, excluding the safe area */
+  --tabbar-h: 66px;    /* floating bottom tab bar, excluding the safe area */
+  --tabbar-gap: 10px;  /* gap between the tab bar and the bottom edge */
+
+  /* Glass recipe — one blur strength and one specular edge, reused everywhere. */
+  --blur: blur(28px) saturate(180%);
+  --glass-hi: 0 1px 0 rgba(255, 255, 255, 0.22) inset,
+              0 -1px 0 rgba(255, 255, 255, 0.04) inset,
+              0 0 0 0.5px rgba(255, 255, 255, 0.06) inset;
+  --glass-shadow: 0 18px 44px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 * { box-sizing: border-box; }
@@ -35,10 +45,7 @@ body:not(.admin) .home-grid [data-goto="settings"] { display: none; }
 
 html, body { margin: 0; height: 100%; }
 body {
-  background:
-    radial-gradient(120% 60% at 50% -10%, #1a1608 0%, transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -47,6 +54,23 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+/* Ambient light behind the glass — soft gold and cool blue glows that
+   drift slowly, so the blur has something to refract. A fixed layer rather
+   than background-attachment: fixed, which iOS ignores. */
+body::before {
+  content: "";
+  position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(42% 32% at 18% 12%, rgba(231, 177, 10, 0.26) 0%, transparent 70%),
+    radial-gradient(38% 30% at 86% 28%, rgba(74, 168, 255, 0.16) 0%, transparent 70%),
+    radial-gradient(44% 34% at 70% 92%, rgba(231, 177, 10, 0.14) 0%, transparent 70%),
+    radial-gradient(30% 26% at 10% 80%, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
+  animation: ambient 26s ease-in-out infinite alternate;
+}
+@keyframes ambient {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(3%, -3%, 0) scale(1.08); }
 }
 input, select, textarea { -webkit-user-select: auto; user-select: auto; }
 button { font-family: inherit; touch-action: manipulation; }
@@ -57,16 +81,24 @@ button { font-family: inherit; touch-action: manipulation; }
   display: none;
   padding: var(--pad);
   padding-top: calc(var(--pad) + var(--sat));
-  padding-bottom: calc(24px + var(--tabbar-h) + var(--sab));
+  padding-bottom: calc(24px + var(--tabbar-h) + var(--tabbar-gap) + var(--sab));
 }
-.screen.active { display: block; animation: screen-in 0.28s cubic-bezier(0.25, 0.9, 0.3, 1); }
+.screen.active { display: block; animation: screen-in 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
 .screen.run.active { display: flex; }
 @keyframes screen-in {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .screen.active { animation: none; }
+  body::before { animation: none; }
+}
+
+/* -------- glass surface (shared by cards, panels, bars) -------- */
+.card, .panel, .topbar, .tabbar, .icon-btn, .btn, .ctrl-btn, .restart-btn,
+.check-item, .preset-row, .zone-row, .sound-chip, .link-btn, .seg {
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
 }
 
 /* -------- brand / home -------- */
@@ -85,16 +117,21 @@ button { font-family: inherit; touch-action: manipulation; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px;
 }
 .card {
-  position: relative;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  position: relative; overflow: hidden;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.045));
   border: 1px solid var(--line); color: var(--text);
   border-radius: var(--radius); padding: 20px; text-align: left; cursor: pointer;
   display: flex; flex-direction: column; gap: 6px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 30px rgba(0, 0, 0, 0.35);
-  transition: transform 0.12s ease, border-color 0.15s ease;
+  box-shadow: var(--glass-hi), var(--glass-shadow);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s ease, background 0.2s ease;
 }
-.card:active { transform: scale(0.97); }
-.card:hover { border-color: rgba(231, 177, 10, 0.55); }
+/* Specular sheen across the top-left of the pane. */
+.card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.14) 0%, transparent 55%);
+}
+.card:active { transform: scale(0.97); background: rgba(255, 255, 255, 0.14); }
+.card:hover { border-color: rgba(231, 177, 10, 0.5); }
 .card.big { grid-column: span 2; padding: 22px 24px; }
 /* soft chevron affordance, like a native list row */
 .card.big::after {
@@ -111,18 +148,17 @@ button { font-family: inherit; touch-action: manipulation; }
   position: sticky; top: calc(var(--sat) + 8px); z-index: 20;
   display: flex; align-items: center; gap: 10px;
   margin: 0 0 16px;
-  padding: 10px 12px;
-  background: rgba(9, 9, 11, 0.72);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
+  padding: 9px 10px;
+  background: rgba(20, 20, 26, 0.55);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 999px;
+  box-shadow: var(--glass-hi), 0 12px 32px rgba(0, 0, 0, 0.4);
 }
-.topbar h1 { font-size: 19px; margin: 0; font-weight: 750; letter-spacing: -0.01em; line-height: 1.15; }
+.topbar h1 { font-size: 18px; margin: 0; font-weight: 750; letter-spacing: -0.01em; line-height: 1.15; }
 /* Small MTEAM mark on every screen header (white via the same invert trick as home). */
-.topbar-logo { height: 30px; width: auto; margin-left: auto; filter: invert(1); mix-blend-mode: screen; opacity: 0.9; pointer-events: none; }
+.topbar-logo { height: 28px; width: auto; margin-left: auto; margin-right: 8px; filter: invert(1); mix-blend-mode: screen; opacity: 0.9; pointer-events: none; }
 /* Narrow phones: smaller logo so titles like "Select Poomsae" keep one line. */
-@media (max-width: 400px) { .topbar-logo { height: 24px; } }
+@media (max-width: 400px) { .topbar-logo { height: 22px; } }
 /* Run screen: truly centered (absolute) so the space-between meta doesn't push it off. */
 .run-top-logo {
   position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
@@ -130,18 +166,20 @@ button { font-family: inherit; touch-action: manipulation; }
 }
 .topbar-logo.logo-fallback, .run-top-logo.logo-fallback { filter: none; mix-blend-mode: normal; }
 .icon-btn {
-  width: 38px; height: 38px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--panel-2); color: var(--text); font-size: 19px; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: transform 0.12s ease;
+  width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.09); color: var(--text); font-size: 19px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  box-shadow: var(--glass-hi);
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease;
 }
-.icon-btn:active { transform: scale(0.92); }
-.icon-btn.ghost { border: none; background: rgba(255, 255, 255, 0.08); font-size: 22px; }
+.icon-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.18); }
+.icon-btn.ghost { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08); font-size: 22px; }
 
 .panel {
+  position: relative;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 18px; margin-bottom: 14px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  box-shadow: var(--glass-hi), 0 12px 36px rgba(0, 0, 0, 0.32);
 }
 .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin: 0 0 14px; font-weight: 700; }
 
@@ -153,14 +191,16 @@ input, select {
   background: var(--bg-2); color: var(--text); border: 1px solid var(--line);
   border-radius: var(--radius-sm); padding: 13px 14px; font-size: 16px; width: 100%;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 input:focus, select:focus {
+  background: rgba(255, 255, 255, 0.09);
   border-color: rgba(231, 177, 10, 0.7);
-  box-shadow: 0 0 0 3px rgba(231, 177, 10, 0.18);
+  box-shadow: 0 0 0 4px rgba(231, 177, 10, 0.16), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
 }
-input[type="range"] { padding: 0; border: none; box-shadow: none; accent-color: var(--gold); height: 32px; }
-input[type="checkbox"] { accent-color: var(--gold); }
+input[type="range"] { padding: 0; border: none; box-shadow: none; background: transparent; accent-color: var(--gold); height: 32px; }
+input[type="checkbox"] { accent-color: var(--gold); box-shadow: none; }
 select {
   appearance: none; -webkit-appearance: none;
   background-image:
@@ -180,19 +220,19 @@ select {
 
 /* -------- segmented control -------- */
 .seg {
-  display: flex; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line);
+  display: flex; background: rgba(0, 0, 0, 0.32); border: 1px solid var(--line);
   border-radius: 999px; padding: 4px; margin-bottom: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45) inset, 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .seg-btn {
   flex: 1; border: none; background: transparent; color: var(--muted);
   padding: 10px 6px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 650;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .seg-btn.active {
-  background: var(--gold); color: #000;
-  box-shadow: 0 2px 8px rgba(231, 177, 10, 0.35);
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #000;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 4px 14px rgba(231, 177, 10, 0.35);
 }
 .mode-block.hidden { display: none; }
 
@@ -201,9 +241,10 @@ select {
 .check-item {
   display: flex; align-items: center; gap: 12px; background: var(--bg-2);
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px 14px; cursor: pointer;
-  transition: border-color 0.15s ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.check-item:has(input:checked) { border-color: rgba(231, 177, 10, 0.6); background: rgba(231, 177, 10, 0.07); }
+.check-item:has(input:checked) { border-color: rgba(231, 177, 10, 0.6); background: rgba(231, 177, 10, 0.1); }
 .check-item input { width: 20px; height: 20px; }
 .ci-name { flex: 1; font-size: 15px; font-weight: 500; }
 .ci-meta { color: var(--muted); font-size: 12px; }
@@ -216,10 +257,10 @@ select {
 .pool-head b { color: var(--gold-soft); font-weight: 700; margin-left: 4px; }
 .pool-actions { display: flex; gap: 4px; }
 .link-btn {
-  background: transparent; border: 1px solid var(--line); color: var(--text);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); color: var(--text);
   border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 650; cursor: pointer;
 }
-.link-btn:active { background: rgba(255, 255, 255, 0.08); }
+.link-btn:active { background: rgba(255, 255, 255, 0.14); }
 .pool-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .pool-chip {
   padding: 9px 13px; border-radius: 999px; cursor: pointer; font-size: 13.5px; font-weight: 600;
@@ -229,8 +270,9 @@ select {
 }
 .pool-chip:active { transform: scale(0.95); }
 .pool-chip.active {
-  background: rgba(231, 177, 10, 0.14); color: var(--gold-soft);
+  background: rgba(231, 177, 10, 0.16); color: var(--gold-soft);
   border: 1px solid rgba(231, 177, 10, 0.6); text-decoration: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
 }
 
 /* -------- preset drill rows -------- */
@@ -244,13 +286,14 @@ select {
   position: relative;
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
   width: 100%; text-align: left; cursor: pointer;
-  background: var(--bg-2); color: var(--text);
+  background: var(--panel); color: var(--text);
   border: 1px solid var(--line); border-radius: var(--radius-sm);
   padding: 14px 40px 14px 14px;
-  transition: transform 0.12s ease, border-color 0.15s ease;
+  box-shadow: var(--glass-hi);
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s ease, background 0.15s ease;
 }
-.preset-row:active { transform: scale(0.98); }
-.preset-row:hover { border-color: rgba(231, 177, 10, 0.55); }
+.preset-row:active { transform: scale(0.98); background: rgba(255, 255, 255, 0.12); }
+.preset-row:hover { border-color: rgba(231, 177, 10, 0.5); }
 .preset-row::after {
   content: "›";
   position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
@@ -262,12 +305,13 @@ select {
 /* -------- buttons -------- */
 .btn {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
-  border-radius: var(--radius-sm); padding: 11px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
-  transition: transform 0.12s ease;
+  border-radius: 999px; padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  box-shadow: var(--glass-hi);
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease;
 }
-.btn:active { transform: scale(0.96); }
-.btn.ghost { background: transparent; }
-.btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
+.btn:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.18); }
+.btn.ghost { background: rgba(255, 255, 255, 0.04); }
+.btn.active { background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #000; border-color: transparent; }
 .btn:disabled { opacity: 0.4; cursor: default; }
 /* Estimated total time for the current selection — updates live. */
 .est-line {
@@ -275,12 +319,16 @@ select {
   font-variant-numeric: tabular-nums; margin: 2px 0 12px; min-height: 1em;
 }
 .start-btn {
-  position: sticky; bottom: calc(12px + var(--tabbar-h) + var(--sab)); z-index: 15;
+  position: sticky; bottom: calc(12px + var(--tabbar-h) + var(--tabbar-gap) + var(--sab)); z-index: 15;
   width: 100%; padding: 18px; font-size: 17px; font-weight: 800; letter-spacing: 0.01em;
   background: linear-gradient(180deg, var(--gold-soft), var(--gold));
   color: #000; border: none; border-radius: 999px; cursor: pointer;
-  box-shadow: 0 8px 28px rgba(231, 177, 10, 0.35), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
-  transition: transform 0.12s ease;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.55) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.12) inset,
+    0 10px 32px rgba(231, 177, 10, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .start-btn:active { transform: scale(0.98); }
 
@@ -289,8 +337,9 @@ select {
 .editor-actions .start-btn { flex: 1; position: static; }
 .test-btn {
   width: 100%; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer;
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--go); border-radius: var(--radius-sm);
+  background: rgba(52, 199, 107, 0.1); color: var(--text); border: 1px solid var(--go); border-radius: 999px;
   margin-bottom: 12px;
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
 }
 .test-btn.testing { background: var(--go); color: #001; border-color: var(--go); }
 
@@ -299,16 +348,20 @@ select {
 .sound-chip {
   padding: 10px 16px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 600;
   background: var(--bg-2); color: var(--text); border: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
   transition: transform 0.1s ease, background 0.15s ease;
 }
 .sound-chip:active { transform: scale(0.95); }
-.sound-chip.active { background: var(--gold); color: #000; border-color: var(--gold); }
+.sound-chip.active {
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #000; border-color: transparent;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 4px 14px rgba(231, 177, 10, 0.3);
+}
 
 /* -------- tempo preview (button beside a tempo picker) -------- */
 .tempo-row { display: flex; gap: 8px; align-items: stretch; }
 .tempo-row select { flex: 1; min-width: 0; }
 .preview-btn { flex: none; white-space: nowrap; border-radius: var(--radius-sm); }
-.preview-btn.playing { background: var(--gold); color: #000; border-color: var(--gold); }
+.preview-btn.playing { background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #000; border-color: transparent; }
 
 /* -------- clip upload panel -------- */
 .vp-buttons { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
@@ -343,40 +396,48 @@ select {
 .rz-num {
   font-size: clamp(56px, 16vw, 120px); font-weight: 900; line-height: 0.9; color: var(--gold);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 60px rgba(231, 177, 10, 0.35);
+  text-shadow: 0 0 60px rgba(231, 177, 10, 0.4);
 }
 .rz-name { font-size: clamp(22px, 6vw, 36px); font-weight: 800; margin-top: 8px; }
 .rz-result.rz-pop { animation: pop 0.32s ease; }
 
 /* ============================================================
    BOTTOM TAB BAR
-   Fixed to the bottom like a native app; one tap to any section.
+   A floating glass pill, inset from the edges like iOS; the active
+   tab sits inside its own small glass lens.
    ============================================================ */
 .tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  position: fixed; left: 14px; right: 14px; bottom: calc(var(--tabbar-gap) + var(--sab)); z-index: 30;
   display: flex; justify-content: center; gap: 2px;
-  max-width: 720px; margin: 0 auto;
-  height: calc(var(--tabbar-h) + var(--sab));
-  padding: 6px 6px calc(4px + var(--sab));
-  background: rgba(13, 13, 16, 0.86);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
-  border-top: 1px solid var(--line);
-}
-@media (min-width: 720px) {
-  .tabbar { border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-radius: 18px 18px 0 0; }
+  max-width: 560px; margin: 0 auto;
+  height: var(--tabbar-h);
+  padding: 6px;
+  background: rgba(22, 22, 28, 0.62);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--glass-hi), 0 18px 48px rgba(0, 0, 0, 0.55);
 }
 .tab {
-  flex: 1; min-width: 0; border: none; background: transparent; color: var(--muted);
-  border-radius: 14px; padding: 6px 2px 4px; cursor: pointer;
+  position: relative; flex: 1; min-width: 0; border: none; background: transparent; color: var(--muted);
+  border-radius: 999px; padding: 5px 2px 4px; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   font-size: 10.5px; font-weight: 650; letter-spacing: 0.02em;
-  transition: color 0.15s ease, transform 0.12s ease;
+  transition: color 0.18s ease, transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* The lens behind the active tab. */
+.tab::before {
+  content: ""; position: absolute; inset: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 4px 12px rgba(0, 0, 0, 0.25);
+  opacity: 0; transform: scale(0.85);
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tab svg, .tab span { position: relative; }
 .tab svg { width: 23px; height: 23px; }
 .tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .tab:active { transform: scale(0.92); }
-.tab.active { color: var(--gold); }
+.tab.active { color: var(--gold-soft); }
+.tab.active::before { opacity: 1; transform: scale(1); }
 .tab.active svg { filter: drop-shadow(0 0 8px rgba(231, 177, 10, 0.45)); }
 /* Gym mode: no tab bar during a run. */
 body.running .tabbar { display: none; }
@@ -385,6 +446,7 @@ body.running .tabbar { display: none; }
    RUN SCREEN — gym mode
    ============================================================ */
 body.running { background: #000; }
+body.running::before { opacity: 0.45; }
 .screen.run {
   flex-direction: column; min-height: 100dvh;
   padding: calc(16px + var(--sat)) 20px calc(16px + var(--sab));
@@ -398,6 +460,7 @@ body.running { background: #000; }
 /* Tempo chip — shows the pace this session runs at (drills & counting). */
 #run-tempo {
   color: var(--gold-soft); font-size: 12px; font-weight: 700;
+  background: rgba(231, 177, 10, 0.1);
   border: 1px solid rgba(231, 177, 10, 0.4); border-radius: 999px;
   padding: 3px 10px; margin-top: 3px; font-variant-numeric: tabular-nums;
 }
@@ -424,18 +487,19 @@ body.running { background: #000; }
 .run-timeleft:empty { display: none; }
 /* Tall, transparent hit area around the visible 8px track so it's easy to grab. */
 .progress {
-  position: relative; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 99px;
+  position: relative; height: 8px; background: rgba(255, 255, 255, 0.12); border-radius: 99px;
   padding: 14px 0; background-clip: content-box; margin: -14px 0;
 }
 .progress-bar {
   position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   height: 8px; width: 0; background: linear-gradient(90deg, var(--gold), var(--gold-soft));
   border-radius: 99px; transition: width 0.08s linear;
+  box-shadow: 0 0 14px rgba(231, 177, 10, 0.4);
 }
 /* Scrub thumb — hidden until the current phase is seekable. */
 .progress-thumb {
   position: absolute; top: 50%; left: 0; width: 20px; height: 20px; border-radius: 50%;
-  background: var(--gold); box-shadow: 0 0 0 4px rgba(231, 177, 10, 0.25);
+  background: var(--gold); box-shadow: 0 0 0 4px rgba(231, 177, 10, 0.25), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
   transform: translate(-50%, -50%) scale(0); transition: transform 0.1s;
   pointer-events: none;
 }
@@ -446,13 +510,22 @@ body.running { background: #000; }
 .run-buttons { display: flex; gap: 12px; }
 .stop-btn, .restart-btn, .ctrl-btn {
   flex: 1; padding: 17px; font-size: 17px; font-weight: 800; border: none; border-radius: 999px; cursor: pointer;
-  transition: transform 0.12s ease;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease;
 }
-.stop-btn { background: var(--stop); color: #fff; box-shadow: 0 6px 20px rgba(229, 72, 77, 0.3); }
-.restart-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line-strong); }
-.ctrl-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line-strong); }
+.stop-btn {
+  background: linear-gradient(180deg, #ef5c61, var(--stop)); color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 8px 24px rgba(229, 72, 77, 0.35);
+}
+.restart-btn, .ctrl-btn {
+  background: rgba(255, 255, 255, 0.09); color: var(--text); border: 1px solid var(--line-strong);
+  box-shadow: var(--glass-hi);
+}
+.restart-btn:active, .ctrl-btn:active { background: rgba(255, 255, 255, 0.18); }
 /* Pause button glows gold while the session is paused. */
-.ctrl-btn.paused { background: var(--gold); color: #000; border-color: var(--gold); }
+.ctrl-btn.paused {
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #000; border-color: transparent;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 8px 24px rgba(231, 177, 10, 0.35);
+}
 .restart-btn:active, .stop-btn:active, .ctrl-btn:active { transform: scale(0.97); }
 
 /* phase-driven accent color on the big number */
@@ -473,4 +546,16 @@ body[data-phase="baro"] .run-title { animation: pop 0.4s ease; }
 
 @media (min-width: 720px) {
   .run-title { max-width: 90%; }
+}
+
+/* Accessibility: if the device asks for less transparency, fall back to
+   solid panes (no blur) — same layout, same colors. */
+@media (prefers-reduced-transparency: reduce) {
+  .card, .panel, .topbar, .tabbar, .icon-btn, .btn, .ctrl-btn, .restart-btn,
+  .check-item, .preset-row, .zone-row, .sound-chip, .link-btn, .seg, .test-btn {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .card, .panel, .preset-row { background: var(--panel-solid); }
+  .topbar, .tabbar { background: #141419; }
+  body::before { display: none; }
 }
