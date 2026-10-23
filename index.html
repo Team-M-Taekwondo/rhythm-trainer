@@ -10,13 +10,26 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=110" />
+  <link rel="stylesheet" href="css/styles.css?v=111" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=110" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=110" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=111" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=111" />
 </head>
 <body>
+  <!-- Living background: glow orbs drift behind the glass and slow rings
+       pulse outward like a metronome. Pure CSS, transform-only animation,
+       tinted by the run phase. Decorative — hidden from screen readers. -->
+  <div class="bg" aria-hidden="true">
+    <span class="orb o1"></span>
+    <span class="orb o2"></span>
+    <span class="orb o3"></span>
+    <span class="orb o4"></span>
+    <span class="ring r1"></span>
+    <span class="ring r2"></span>
+    <span class="ring r3"></span>
+    <span class="grain"></span>
+  </div>
   <div id="app">
     <!-- ================= HOME ================= -->
     <section class="screen active" data-screen="home">
@@ -662,9 +675,9 @@
   </nav>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=110"></script>
-  <script src="js/audio.js?v=110"></script>
-  <script src="js/engine.js?v=110"></script>
-  <script src="js/app.js?v=110"></script>
+  <script src="js/data.js?v=111"></script>
+  <script src="js/audio.js?v=111"></script>
+  <script src="js/engine.js?v=111"></script>
+  <script src="js/app.js?v=111"></script>
 </body>
 </html>
