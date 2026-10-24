@@ -329,8 +329,9 @@
       await say(MT.CUES.sijak.say, player, settings, STYLE.sijak);
     }
   }
-  // cue: which command opens the next set — "sijak" (drills) or "joonbi"
-  // (general counting, where the instructor calls the start themselves).
+  // cue: which command opens the next set — "sijak" (drills), "joonbi"
+  // (counting, where the instructor calls the start themselves) or "none"
+  // (the caller announces the next drill first, then calls Joonbi itself).
   async function drillRest(seconds, player, cb, settings, cue) {
     for (let r = seconds; r > 0; r--) {
       if (stopped(player)) return;
@@ -339,6 +340,7 @@
       await wait(1, player);
     }
     if (stopped(player)) return;
+    if (cue === "none") return;
     if (cue === "joonbi") {
       cb.onPhase("joonbi", "Joonbi");
       await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
@@ -374,30 +376,75 @@
     await wait(2.4, player); // let the bell ring out before onDone
   }
 
-  /* ---- Counting drill: spoken Korean counting for instructor-called drills.
-     3-2-1 → Joonbi → count 1..target (decade style: 11→둘, 21→셋 …) at the
-     chosen interval → rest with spoken countdown → Joonbi → next set. Ends with
-     the chime, no rest after the final set. ---- */
+  /* ---- Korean Counting: spoken Korean counting, one or more drills in a
+     row. session.drills = [{ name, say, interval, sets }]; each drill runs
+     all of its own sets before the next one starts.
+     First drill: [announce] → 3-2-1 → Joonbi → count 1..target (decade
+     style: 11→둘, 21→셋 …) at the drill's interval → soft set chime → rest
+     with spoken countdown → Joonbi → next set. A new drill is announced
+     after the rest, then Joonbi. The session ends on the big finish chime
+     (no set chime and no rest after the final set). ---- */
+  const SET_CHIME = 1.0; // seconds the set chime gets to ring before the rest
+  const ANNOUNCE_OPTS = { lang: "en-US", absolute: true, rate: 0.95 };
+  function countDrills(session) {
+    return session.drills && session.drills.length
+      ? session.drills
+      : [{ name: "Counting", interval: session.interval, sets: session.sets }];
+  }
   async function runCounting(session, player, cb, settings) {
     if (MT.resumeAudio) MT.resumeAudio();
-    for (let s = 0; s < session.sets; s++) {
-      if (player.cancelled) return;
-      player.skip = false; // a Skip advances to the next set
-      cb.onItem({ set: s + 1, sets: session.sets, item: 1, items: 1, name: "Counting" });
-      if (s === 0) await drillCountdown(player, cb, settings, "joonbi");
-      if (player.cancelled) return;
-      cb.onPhase("go", "Counting");
-      // First count comes a fixed 1s after "Joonbi" (drills use their tempo).
-      await wait(1, player);
-      for (let n = 1; n <= session.target; n++) {
-        if (stopped(player)) break;
-        cb.onCount(n, session.target);
-        cb.onProgress(n / session.target);
-        if (settings.voice) MT.speak(MT.countWord(n), { rate: 1.0 }); // fire-and-forget: keeps the interval steady
-        await wait(session.interval, player);
+    const drills = countDrills(session);
+    for (let di = 0; di < drills.length; di++) {
+      const d = drills[di];
+      for (let s = 0; s < d.sets; s++) {
+        if (player.cancelled) return;
+        player.skip = false; // a Skip advances to the next set
+        cb.onItem({
+          set: s + 1,
+          sets: d.sets,
+          item: di + 1,
+          items: drills.length,
+          name: d.name,
+          tempo: d.interval.toFixed(1) + "s / count",
+        });
+        const first = di === 0 && s === 0;
+        if (s === 0) {
+          // New drill: rest first (not before the very first), then say its
+          // name so athletes know what's coming, then Joonbi.
+          if (!first) await drillRest(session.restSeconds, player, cb, settings, "none");
+          if (player.cancelled) return;
+          if (d.say && !stopped(player)) {
+            cb.onPhase("announce", d.name);
+            await say(d.say, player, settings, ANNOUNCE_OPTS);
+            await wait(GAP, player);
+          }
+          if (first) await drillCountdown(player, cb, settings, "joonbi");
+          else if (!stopped(player)) {
+            cb.onPhase("joonbi", "Joonbi");
+            await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+          }
+        } else {
+          await drillRest(session.restSeconds, player, cb, settings, "joonbi");
+        }
+        if (player.cancelled) return;
+        cb.onPhase("go", d.name);
+        // First count comes a fixed 1s after "Joonbi" (drills use their tempo).
+        await wait(1, player);
+        for (let n = 1; n <= session.target; n++) {
+          if (stopped(player)) break;
+          cb.onCount(n, session.target);
+          cb.onProgress(n / session.target);
+          if (settings.voice) MT.speak(MT.countWord(n), { rate: 1.0 }); // fire-and-forget: keeps the interval steady
+          await wait(d.interval, player);
+        }
+        if (player.cancelled) return;
+        const last = di === drills.length - 1 && s === d.sets - 1;
+        if (!last && !player.skip) {
+          cb.onPhase("setdone", "Set complete");
+          MT.playSetChime();
+          await wait(SET_CHIME, player);
+        }
       }
-      if (player.cancelled) return;
-      if (s < session.sets - 1) await drillRest(session.restSeconds, player, cb, settings, "joonbi");
     }
     if (player.cancelled) return;
     cb.onPhase("done", "Complete");
@@ -916,14 +963,30 @@
       tail: 2.4,
     };
   }
-  function countParts(session, settings) {
+  // Korean Counting, from drill `fromDi` / set `fromSi` to the end — the
+  // same shape as runCounting: rest → [announce] → Joonbi → 1s → counts →
+  // set chime, with the 3-2-1 up front and the finish chime at the end.
+  function countFrom(session, settings, fromDi, fromSi) {
+    const drills = countDrills(session);
     const joonbi = cueLen(MT.CUES.joonbi.say, 0.9, settings);
-    return {
-      intro: 3 + joonbi,
-      set: 1 + session.target * session.interval,
-      between: session.restSeconds + joonbi,
-      tail: 2.4,
-    };
+    let t = 0;
+    for (let di = fromDi; di < drills.length; di++) {
+      const d = drills[di];
+      for (let s = di === fromDi ? fromSi : 0; s < d.sets; s++) {
+        const first = di === 0 && s === 0;
+        if (s === 0) {
+          if (!first) t += session.restSeconds;
+          if (d.say) t += (settings.voice ? 1.4 : 0.6) + GAP;
+          t += (first ? 3 : 0) + joonbi;
+        } else {
+          t += session.restSeconds + joonbi;
+        }
+        t += 1 + session.target * d.interval;
+        const last = di === drills.length - 1 && s === d.sets - 1;
+        t += last ? 2.4 : SET_CHIME;
+      }
+    }
+    return t;
   }
 
   // Poomsae Intro drill: fixed cue overhead of one rep (Joonbi → Sijak →
@@ -964,8 +1027,9 @@
   // Total estimated seconds for a session object (same shape startRun takes).
   MT.estimateSession = function (session) {
     const settings = MT.loadSettings();
-    if (session.kind === "drill" || session.kind === "count") {
-      const p = session.kind === "drill" ? drillParts(session, settings) : countParts(session, settings);
+    if (session.kind === "count") return countFrom(session, settings, 0, 0);
+    if (session.kind === "drill") {
+      const p = drillParts(session, settings);
       return p.intro + session.sets * p.set + (session.sets - 1) * p.between + p.tail;
     }
     if (session.kind === "pdrill") {
@@ -997,8 +1061,9 @@
   // use the actually-drawn poomsae instead of the pool average.
   MT.estimateRemaining = function (session, info) {
     const settings = MT.loadSettings();
-    if (session.kind === "drill" || session.kind === "count") {
-      const p = session.kind === "drill" ? drillParts(session, settings) : countParts(session, settings);
+    if (session.kind === "count") return countFrom(session, settings, info.item - 1, info.set - 1);
+    if (session.kind === "drill") {
+      const p = drillParts(session, settings);
       const left = session.sets - info.set; // full sets after this one
       return (info.set === 1 ? p.intro : 0) + (left + 1) * p.set + left * p.between + p.tail;
     }

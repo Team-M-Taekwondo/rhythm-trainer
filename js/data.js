@@ -61,49 +61,76 @@
 
   /* -------------------- Preset drills --------------------
      The team's common training drills, variables pre-set. Tempos are stored
-     at BLACK BELT speed; levels move tempo only: Comp. Black −0.1s, Color
-     Belts +0.1s. (The 2 Pooms drill is stored at 1.9s so Comp. Black lands
-     on its 1.8s reference speed.)
+     at BLACK BELT speed; Color Belts add the drill's colorDelta (0.1s for
+     the original drills, 0.5s for the Back/Tiger stance sections).
      Every drill ends the same way: no rest after the last set, just the
      finish chime — that's how athletes know the cycle is over.
      kick: true shows the kick-hold option on the config screen.
-     pooms splits Standing drills into a Single/Multiple Pooms chooser, and
-     stance groups the rows under a stance heading inside each. The full
-     drill name (shown on the config and run screens) is stance + name. */
+     stance groups the Standing rows under a stance heading. The full drill
+     name (shown on the config and run screens) is stance + name. */
   MT.PRESET_LEVELS = [
-    { id: "comp", label: "Comp. Black", delta: -0.1 },
-    { id: "black", label: "Black Belts", delta: 0 },
-    { id: "color", label: "Color Belts", delta: 0.1 },
+    { id: "black", label: "Black Belts" },
+    { id: "color", label: "Color Belts" },
   ];
   MT.PRESET_DRILLS = [
     { id: "front",  group: "Ground drills",   name: "Front Kicks",       tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
     { id: "round",  group: "Ground drills",   name: "Round House Kicks", tempo: 0.9, reps: 15, rest: 10, sets: 4, kick: true },
     { id: "side",   group: "Ground drills",   name: "Side Kicks",        tempo: 1.1, reps: 15, rest: 10, sets: 4, kick: true },
-    { id: "horse",  group: "Standing drills", pooms: "single", stance: "Horse Stance", name: "Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
-    { id: "inplace", group: "Standing drills", pooms: "single", stance: "Front Stance", name: "In Place · Blocks/Attacks",    tempo: 1.0, reps: 20, rest: 10, sets: 4 },
-    { id: "udblock", group: "Standing drills", pooms: "single", stance: "Front Stance", name: "Forward/Back · Blocks",        tempo: 1.5, reps: 20, rest: 10, sets: 4 },
-    { id: "udattack", group: "Standing drills", pooms: "single", stance: "Front Stance", name: "Forward/Back · Attacks",      tempo: 1.4, reps: 20, rest: 10, sets: 4 },
-    { id: "fb2poom", group: "Standing drills", pooms: "multiple", stance: "Front Stance", name: "Forward/Back · 2 Pooms",     tempo: 1.9, reps: 20, rest: 10, sets: 4 },
+    { id: "horse",  group: "Standing drills", stance: "Horse Stance", name: "Side to Side · Blocks/Attacks", tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "inplace", group: "Standing drills", stance: "Front Stance", name: "Stationary · Blocks/Attacks",  tempo: 1.0, reps: 20, rest: 10, sets: 4 },
+    { id: "udblock", group: "Standing drills", stance: "Front Stance", name: "Forward/Back · Blocks",        tempo: 1.5, reps: 20, rest: 10, sets: 4 },
+    { id: "udattack", group: "Standing drills", stance: "Front Stance", name: "Forward/Back · Attacks",      tempo: 1.4, reps: 20, rest: 10, sets: 4 },
+    { id: "bs-stat",   group: "Standing drills", stance: "Back Stance",  name: "Stationary · Blocks/Attacks", tempo: 1.5, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
+    { id: "bs-block",  group: "Standing drills", stance: "Back Stance",  name: "Forward/Back · Blocks",       tempo: 1.7, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
+    { id: "bs-attack", group: "Standing drills", stance: "Back Stance",  name: "Forward/Back · Attacks",      tempo: 1.5, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
+    { id: "ts-stat",   group: "Standing drills", stance: "Tiger Stance", name: "Stationary · Blocks/Attacks", tempo: 1.5, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
+    { id: "ts-block",  group: "Standing drills", stance: "Tiger Stance", name: "Forward/Back · Blocks",       tempo: 1.7, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
+    { id: "ts-attack", group: "Standing drills", stance: "Tiger Stance", name: "Forward/Back · Attacks",      tempo: 1.5, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
   ];
   // Full drill name — "Front Stance · Forward/Back · Blocks".
   MT.presetName = (d) => (d.stance ? d.stance + " · " + d.name : d.name);
+  // A preset's tempo at a level, on the 0.1s grid the tempo picker uses.
+  MT.presetTempo = function (d, level) {
+    const delta = level === "color" ? (d.colorDelta != null ? d.colorDelta : 0.1) : 0;
+    return Math.max(0.1, Math.round((d.tempo + delta) * 10) / 10);
+  };
 
-  /* Counting-drill levels. Interval presets are stored at the COMPETITION
-     BLACK BELT reference tempo; the other levels add a fixed amount:
-     Comp. Black as listed, Black Belt +0.5s, Color Belt +1.0s.
-     New counting presets should always be entered at the comp reference. */
+  /* -------------------- Korean Counting: custom drills --------------------
+     Spoken Korean counting for the team's kick and stance drills. Intervals
+     are stored at BLACK BELT speed; Color Belts add 0.5s to every drill.
+     blackOnly drills (hook kicks) don't show for Color Belts.
+     `say` is the short spoken intro (English) before the drill starts —
+     the long stance names would be a mouthful. stance groups the rows under
+     a stance heading; the full name (run screen) is stance + name. */
   MT.COUNT_LEVELS = [
-    { id: "comp", label: "Comp. Black", delta: 0 },
-    { id: "black", label: "Black Belts", delta: 0.5 },
-    { id: "color", label: "Color Belts", delta: 1.0 },
+    { id: "black", label: "Black Belts", delta: 0 },
+    { id: "color", label: "Color Belts", delta: 0.5 },
   ];
-  // Counting drill: seconds between counts at the comp reference.
-  // Presets match the common kicks.
-  MT.COUNT_INTERVALS = [
-    { v: 2.0, label: "Front kick" },
-    { v: 2.3, label: "Round house" },
-    { v: 2.5, label: "Side kick" },
+  MT.COUNT_SECTIONS = [
+    { id: "kicks", label: "Kicks" },
+    { id: "stances", label: "Stances" },
   ];
+  MT.COUNT_DRILLS = [
+    { id: "k-front",  section: "kicks", name: "Front Kick",    say: "Front kick",      tempo: 3.0 },
+    { id: "k-round",  section: "kicks", name: "Round House",   say: "Round house",     tempo: 3.3 },
+    { id: "k-side",   section: "kicks", name: "Side Kick",     say: "Side kick",       tempo: 4.0 },
+    { id: "k-hook",   section: "kicks", name: "Hook Kick",     say: "Hook kick",       tempo: 5.0, blackOnly: true },
+    { id: "k-front2", section: "kicks", name: "2 Front Kicks", say: "Two front kicks", tempo: 5.0 },
+    { id: "k-round2", section: "kicks", name: "2 Round House", say: "Two round house", tempo: 5.5 },
+    { id: "k-side2",  section: "kicks", name: "2 Side Kicks",  say: "Two side kicks",  tempo: 6.5 },
+    { id: "k-hook2",  section: "kicks", name: "2 Hook Kicks",  say: "Two hook kicks",  tempo: 7.0, blackOnly: true },
+    { id: "s-front-b", section: "stances", stance: "Front Stance", name: "Step back, hold, step forward", say: "Front stance, step back first",    tempo: 2.0 },
+    { id: "s-front-f", section: "stances", stance: "Front Stance", name: "Step forward, hold, step back", say: "Front stance, step forward first", tempo: 2.0 },
+    { id: "s-back-b",  section: "stances", stance: "Back Stance",  name: "Step back, hold, step forward", say: "Back stance, step back first",     tempo: 2.0 },
+    { id: "s-back-f",  section: "stances", stance: "Back Stance",  name: "Step forward, hold, step back", say: "Back stance, step forward first",  tempo: 2.0 },
+    { id: "s-tiger-b", section: "stances", stance: "Tiger Stance", name: "Step back, hold, step forward", say: "Tiger stance, step back first",    tempo: 2.0 },
+    { id: "s-tiger-f", section: "stances", stance: "Tiger Stance", name: "Step forward, hold, step back", say: "Tiger stance, step forward first", tempo: 2.0 },
+    { id: "s-horse-1", section: "stances", stance: "Horse Stance", name: "One side at a time",            say: "Horse stance, one side at a time", tempo: 2.0 },
+    { id: "s-horse-2", section: "stances", stance: "Horse Stance", name: "Side to side",                  say: "Horse stance, side to side",       tempo: 3.5 },
+    { id: "s-crane",   section: "stances", name: "Crane Stance",                                          say: "Crane stance",                     tempo: 8.0 },
+  ];
+  // Full drill name — "Front Stance · Step back, hold, step forward".
+  MT.countDrillName = (d) => (d.stance ? d.stance + " · " + d.name : d.name);
 
   // Belt sections. Divisions apply to Black Belt only.
   MT.SECTIONS = [

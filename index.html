@@ -10,11 +10,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>MTEAM Tempo Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=111" />
+  <link rel="stylesheet" href="css/styles.css?v=112" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Home-screen icons. iOS uses apple-touch-icon (PNG only); others use the manifest. -->
-  <link rel="apple-touch-icon" href="assets/icon-512.png?v=111" />
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=111" />
+  <link rel="apple-touch-icon" href="assets/icon-512.png?v=112" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg?v=112" />
 </head>
 <body>
   <!-- Living background: glow orbs drift behind the glass and slow rings
@@ -53,8 +53,8 @@
         </button>
         <button class="card big" data-goto="build-count">
           <span class="card-kicker">Korean Counting</span>
-          <span class="card-title">General Counting</span>
-          <span class="card-sub">The app counts out loud while the coach calls the drill</span>
+          <span class="card-title">Custom &amp; General</span>
+          <span class="card-sub">Counted kick &amp; stance drills, or plain counting at your own pace</span>
         </button>
         <button class="card big" data-goto="randomizer">
           <span class="card-kicker">Poomsae Randomizer</span>
@@ -337,61 +337,87 @@
           <input type="number" inputmode="numeric" id="preset-reps" min="1" max="200" />
         </label>
         <label class="field">
-          <span>Sets per round</span>
+          <span>Number of sets</span>
           <input type="number" inputmode="numeric" id="preset-sets" min="1" max="20" />
         </label>
         <label class="field">
           <span>Rest between sets (seconds)</span>
           <input type="number" inputmode="numeric" id="preset-rest" min="0" max="120" />
         </label>
-        <label class="field">
-          <span>Rounds (1 round = all sets once)</span>
-          <input type="number" inputmode="numeric" id="preset-rounds" min="1" max="10" value="1" />
-        </label>
       </div>
       <p class="est-line" id="preset-est"></p>
       <button class="start-btn" id="start-preset">Start Drill</button>
     </section>
 
-    <!-- ================= GENERAL COUNTING ================= -->
+    <!-- ================= KOREAN COUNTING ================= -->
     <section class="screen" data-screen="build-count">
       <div class="topbar">
         <button class="icon-btn" data-goto="home">&larr;</button>
-        <h1>General Counting</h1>
+        <h1>Korean Counting</h1>
       </div>
-      <div class="panel">
-        <h2>Level</h2>
-        <div class="seg" id="count-level"></div>
+      <div class="seg" id="count-mode">
+        <button class="seg-btn active" data-cmode="custom">Custom Counting</button>
+        <button class="seg-btn" data-cmode="general">General Counting</button>
       </div>
-      <div class="panel">
-        <label class="field">
-          <span>Count up to</span>
-          <input type="number" inputmode="numeric" id="count-target" min="1" max="200" value="10" />
-        </label>
-        <div class="field">
-          <span>Seconds between counts</span>
-          <div class="sound-chips" id="count-intervals"></div>
+
+      <!-- Custom: the team's kick & stance drills, counted out loud. -->
+      <div id="count-custom-block" class="mode-block">
+        <div class="panel">
+          <h2>Level</h2>
+          <div class="seg" id="count-level"></div>
+          <div class="seg" id="count-section">
+            <button class="seg-btn active" data-csection="kicks">Kicks</button>
+            <button class="seg-btn" data-csection="stances">Stances</button>
+          </div>
+          <div id="count-drills"></div>
+          <p class="hint">Tick the drills to run and set each one's sets. Every drill is announced, counted up to the number below, and a soft chime closes each set.</p>
         </div>
-        <div class="field">
-          <span>Custom interval (seconds)</span>
-          <div class="tempo-row">
-            <select id="count-custom"></select>
-            <button type="button" class="sound-chip preview-btn" data-preview="count">&#9654; Preview</button>
+        <div class="panel">
+          <h2>Order &amp; count</h2>
+          <div class="seg" id="count-order">
+            <button class="seg-btn active" data-corder="order">As listed</button>
+            <button class="seg-btn" data-corder="random">Random</button>
+          </div>
+          <label class="field">
+            <span>Count up to</span>
+            <input type="number" inputmode="numeric" id="count-target" min="1" max="200" value="10" />
+          </label>
+          <label class="field">
+            <span>Rest between sets (seconds)</span>
+            <input type="number" inputmode="numeric" id="count-rest" min="0" max="120" value="10" />
+          </label>
+        </div>
+      </div>
+
+      <!-- General: plain counting at a typed interval, no presets. -->
+      <div id="count-general-block" class="mode-block hidden">
+        <div class="panel">
+          <label class="field">
+            <span>Count up to</span>
+            <input type="number" inputmode="numeric" id="gcount-target" min="1" max="200" value="10" />
+          </label>
+          <div class="field">
+            <span>Seconds between counts</span>
+            <div class="tempo-row">
+              <input type="number" inputmode="decimal" id="count-interval" min="0.1" max="30" step="0.1" value="2" />
+              <button type="button" class="sound-chip preview-btn" data-preview="count">&#9654; Preview</button>
+            </div>
           </div>
         </div>
+        <div class="panel">
+          <h2>Sets &amp; rest</h2>
+          <label class="field">
+            <span>Number of sets</span>
+            <input type="number" inputmode="numeric" id="gcount-sets" min="1" max="20" value="2" />
+          </label>
+          <p class="hint">1 set = one full count up to the number above.</p>
+          <label class="field">
+            <span>Rest between sets (seconds)</span>
+            <input type="number" inputmode="numeric" id="gcount-rest" min="0" max="120" value="10" />
+          </label>
+        </div>
       </div>
-      <div class="panel">
-        <h2>Sets &amp; rest</h2>
-        <label class="field">
-          <span>Number of sets</span>
-          <input type="number" inputmode="numeric" id="count-sets" min="1" max="20" value="2" />
-        </label>
-        <p class="hint">1 set = one full count up to the number above.</p>
-        <label class="field">
-          <span>Rest between sets (seconds)</span>
-          <input type="number" inputmode="numeric" id="count-rest" min="0" max="120" value="10" />
-        </label>
-      </div>
+
       <p class="est-line" id="count-est"></p>
       <button class="start-btn" id="start-count">Start Counting</button>
     </section>
@@ -463,6 +489,21 @@
           <select id="rz-rank"></select>
         </label>
         <p class="hint" id="rz-pool"></p>
+      </div>
+
+      <div class="panel">
+        <h2>After the draw</h2>
+        <div class="seg" id="rz-after">
+          <button class="seg-btn active" data-after="announce">Announce only</button>
+          <button class="seg-btn" data-after="rhythm">Play the rhythm</button>
+        </div>
+        <div id="rz-rhythm-wrap" hidden>
+          <div class="field">
+            <span>Speed</span>
+            <div class="sound-chips" id="rz-boost"></div>
+          </div>
+          <p class="hint">Draws a poomsae and runs it right away with its rhythm &mdash; Joonbi &rarr; count &rarr; Sijak &rarr; rhythm &rarr; Baro.</p>
+        </div>
       </div>
 
       <div class="panel rz-result">
@@ -675,9 +716,9 @@
   </nav>
 
   <!-- Bump ?v= on every deploy so browsers always load the latest files. -->
-  <script src="js/data.js?v=111"></script>
-  <script src="js/audio.js?v=111"></script>
-  <script src="js/engine.js?v=111"></script>
-  <script src="js/app.js?v=111"></script>
+  <script src="js/data.js?v=112"></script>
+  <script src="js/audio.js?v=112"></script>
+  <script src="js/engine.js?v=112"></script>
+  <script src="js/app.js?v=112"></script>
 </body>
 </html>

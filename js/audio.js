@@ -165,6 +165,28 @@
     });
   };
 
+  // Set chime — a soft two-note "set done" for Korean Counting drills, so
+  // athletes know the set closed without the big end-of-session bell.
+  MT.playSetChime = function (bus) {
+    ensureContext();
+    keepAlive();
+    const out = bus || master;
+    [783.99, 1046.5].forEach((f, i) => {
+      // G5 then C6
+      const at = ctx.currentTime + 0.05 + i * 0.22;
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(f, at);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(0.4, at + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.9);
+      o.connect(g).connect(out);
+      o.start(at);
+      o.stop(at + 1.0);
+    });
+  };
+
   // Milestone marker for the drill — a bright ascending triple-beep on every
   // 10th rep so athletes can hear the tens without counting in their head.
   MT.playMilestone = function (t, bus) {

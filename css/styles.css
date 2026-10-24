@@ -198,16 +198,17 @@ button { font-family: inherit; touch-action: manipulation; }
   box-shadow: var(--glass-hi), 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 .topbar h1 { font-size: 18px; margin: 0; font-weight: 750; letter-spacing: -0.01em; line-height: 1.15; }
-/* Small MTEAM mark on every screen header (white via the same invert trick as home). */
-.topbar-logo { height: 28px; width: auto; margin-left: auto; margin-right: 8px; filter: invert(1); mix-blend-mode: screen; opacity: 0.9; pointer-events: none; }
+/* Small MTEAM mark on every screen header — an inline SVG that turns the
+   JPG's black ink white and its white paper transparent (see stampLogos),
+   so it sits on the glass with no box behind it. */
+.topbar-logo { height: 28px; width: auto; aspect-ratio: 520 / 150; margin-left: auto; margin-right: 8px; opacity: 0.9; pointer-events: none; flex: none; }
 /* Narrow phones: smaller logo so titles like "Select Poomsae" keep one line. */
 @media (max-width: 400px) { .topbar-logo { height: 22px; } }
 /* Run screen: truly centered (absolute) so the space-between meta doesn't push it off. */
 .run-top-logo {
   position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
-  height: 44px; width: auto; filter: invert(1); mix-blend-mode: screen; opacity: 0.9; pointer-events: none;
+  height: 44px; width: auto; aspect-ratio: 520 / 150; opacity: 0.9; pointer-events: none;
 }
-.topbar-logo.logo-fallback, .run-top-logo.logo-fallback { filter: none; mix-blend-mode: normal; }
 .icon-btn {
   width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.09); color: var(--text); font-size: 19px; cursor: pointer;
@@ -291,6 +292,28 @@ select {
 .check-item input { width: 20px; height: 20px; }
 .ci-name { flex: 1; font-size: 15px; font-weight: 500; }
 .ci-meta { color: var(--muted); font-size: 12px; }
+
+/* -------- Korean Counting drill rows --------
+   One row per drill: tick it to include it; its tempo and set count only
+   appear once ticked, so the list stays short until a drill is chosen. */
+.count-row { flex-wrap: wrap; row-gap: 10px; }
+/* The name keeps at least ~180px; on a phone the inputs wrap under it
+   (indented past the checkbox) instead of squeezing the name into a column. */
+.cr-main { display: flex; align-items: center; gap: 12px; flex: 1 1 180px; min-width: 0; cursor: pointer; }
+.count-vars { display: none; align-items: center; gap: 6px; flex: none; margin-left: 32px; }
+.cr-main + .count-vars { margin-left: auto; }
+@media (max-width: 520px) { .cr-main + .count-vars { margin-left: 32px; } }
+.count-row:has(input:checked) .count-vars { display: flex; }
+.count-vars input {
+  width: 64px; padding: 8px 8px; font-size: 15px; text-align: center;
+  font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+}
+.count-vars input::-webkit-outer-spin-button, .count-vars input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.count-vars input[data-cd-sets] { width: 54px; }
+.cv-unit { color: var(--muted); font-size: 12px; margin-right: 6px; }
+#count-mode { margin-bottom: 16px; }
+#count-section { margin-top: 12px; }
+#count-drills .stance-group:first-child { margin-top: 2px; }
 
 /* -------- random-draw pool (include / exclude chips) -------- */
 .pool-head {

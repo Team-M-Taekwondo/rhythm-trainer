@@ -48,20 +48,43 @@
 
   /* -------------------- brand logo on every screen --------------------
      Home has the big logo; stamp a small MTEAM mark into every other screen's
-     header so the brand shows across the whole app. */
+     header so the brand shows across the whole app.
+     The logo file is a black-on-white JPG. Home flips it with a CSS blend,
+     but inside the glass topbar (its own stacking context) the blend can only
+     see the bar, so the white box came out as a solid black block. Here the
+     JPG goes through an SVG colour-matrix instead: black strokes → opaque
+     white, white paper → transparent. Real transparency, no blending. */
   (function stampLogos() {
+    const NS = "http://www.w3.org/2000/svg";
     const mk = (cls) => {
-      const img = document.createElement("img");
-      img.className = cls;
-      img.src = "assets/logo1.JPG";
-      img.alt = "MTEAM";
-      img.onerror = function () {
-        this.onerror = null;
-        this.src = "assets/logo-light.svg";
-        this.classList.add("logo-fallback");
-      };
-      return img;
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("class", cls);
+      svg.setAttribute("viewBox", "0 0 520 150");
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "MTEAM");
+      const id = "logo-ink-" + Math.random().toString(36).slice(2, 7);
+      svg.innerHTML =
+        `<filter id="${id}" color-interpolation-filters="sRGB">` +
+        // R,G,B → 1 (white); alpha → 1 − luminance (ink opaque, paper clear)
+        `<feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  -0.299 -0.587 -0.114 0 1"/>` +
+        `</filter>` +
+        `<image href="assets/logo1.JPG" width="520" height="150" preserveAspectRatio="xMidYMid meet" filter="url(#${id})"/>`;
+      return svg;
     };
+    // Size the viewBox to the JPG's real shape once it's known, so the mark
+    // isn't letterboxed inside a 520×150 frame.
+    const probe = new Image();
+    probe.onload = () => {
+      const w = probe.naturalWidth, h = probe.naturalHeight;
+      if (!w || !h) return;
+      $$(".topbar-logo, .run-top-logo").forEach((svg) => {
+        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        const img = svg.querySelector("image");
+        if (img) { img.setAttribute("width", w); img.setAttribute("height", h); }
+        svg.style.aspectRatio = w + " / " + h;
+      });
+    };
+    probe.src = "assets/logo1.JPG";
     $$(".topbar").forEach((bar) => bar.appendChild(mk("topbar-logo")));
     const runTop = $(".run-top");
     if (runTop) runTop.insertBefore(mk("run-top-logo"), runTop.querySelector(".run-meta"));
@@ -123,7 +146,7 @@
   function previewSettings(kind) {
     if (kind === "drill") return { interval: Number($("#drill-tempo").value) || 0.8, sound: drillSound };
     if (kind === "preset") return { interval: Number($("#preset-tempo").value) || 0.8, sound: presetSound };
-    return { interval: countInterval, sound: null }; // counting: spoken counts
+    return { interval: Math.max(0.1, Number($("#count-interval").value) || 2), sound: null }; // counting: spoken counts
   }
   function startPreview(btn) {
     stopPreview();
@@ -580,7 +603,6 @@
   let presetLevel = "black";
   let presetDrill = null; // the preset opened on the config screen
   let presetSound = "drum";
-  let standingPooms = "single"; // Standing drills chooser — Single vs Multiple Pooms
   let presetGroup = null; // which drill group is open — null shows the chooser
 
   function renderPresetSoundChips() {
@@ -597,10 +619,8 @@
     playSoundSample(presetSound);
   });
 
-  const levelDelta = () =>
-    (MT.PRESET_LEVELS.find((l) => l.id === presetLevel) || {}).delta || 0;
-  // Level moves tempo only; snap to the 0.1s grid the tempo select uses.
-  const levelTempo = (base) => Math.max(0.1, Math.round((base + levelDelta()) * 10) / 10);
+  // Level moves tempo only (Color Belts add the drill's own colorDelta).
+  const levelTempo = (d) => MT.presetTempo(d, presetLevel);
 
   function renderLevelSeg(sel) {
     $(sel).innerHTML = MT.PRESET_LEVELS.map(
@@ -608,7 +628,7 @@
         `<button class="seg-btn ${l.id === presetLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
     ).join("");
   }
-  // Total run time of a preset at the current level (1 round, as listed).
+  // Total run time of a preset at the current level (as listed).
   function presetEstimate(d, tempo) {
     return MT.estimateSession({
       kind: "drill",
@@ -627,7 +647,7 @@
         <button class="card big" data-pgroup="Standing drills">
           <span class="card-kicker">Option 1</span>
           <span class="card-title">Standing Drills</span>
-          <span class="card-sub">Stance work &mdash; blocks &amp; attacks, single &amp; multiple pooms</span>
+          <span class="card-sub">Stance work &mdash; blocks &amp; attacks in front, back, tiger &amp; horse stance</span>
         </button>
         <button class="card big" data-pgroup="Ground drills">
           <span class="card-kicker">Option 2</span>
@@ -646,21 +666,11 @@
     });
     $("#preset-list").innerHTML = groups
       .map((g) => {
-        // A group with `pooms` drills gets the Single/Multiple Pooms chooser.
-        const hasPooms = g.drills.some((d) => d.pooms);
-        const drills = hasPooms
-          ? g.drills.filter((d) => (d.pooms || "single") === standingPooms)
-          : g.drills;
-        const poomsSeg = hasPooms
-          ? `<div class="seg">
-              <button class="seg-btn ${standingPooms === "single" ? "active" : ""}" data-pooms="single">Single Pooms</button>
-              <button class="seg-btn ${standingPooms === "multiple" ? "active" : ""}" data-pooms="multiple">Multiple Pooms</button>
-            </div>`
-          : "";
+        const drills = g.drills;
         const row = (d) => `
             <button class="preset-row" data-preset="${d.id}">
               <span class="pr-name">${d.name}</span>
-              <span class="pr-meta">${levelTempo(d.tempo).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest · ~${MT.fmtTime(presetEstimate(d, levelTempo(d.tempo)))}</span>
+              <span class="pr-meta">${levelTempo(d).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest · ~${MT.fmtTime(presetEstimate(d, levelTempo(d)))}</span>
             </button>`;
         // Rows sit under a stance heading (Horse Stance, Front Stance…) so the
         // right drill is quick to find; drills without a stance list plainly.
@@ -685,7 +695,6 @@
         return `
       <div class="panel">
         <h2>${g.name}</h2>
-        ${poomsSeg}
         ${rows}
       </div>`;
       })
@@ -714,18 +723,12 @@
       window.scrollTo(0, 0);
       return;
     }
-    const pooms = e.target.closest("[data-pooms]");
-    if (pooms) {
-      standingPooms = pooms.dataset.pooms;
-      renderPresetList();
-      return;
-    }
     const row = e.target.closest("[data-preset]");
     if (!row) return;
     openPresetConfig(row.dataset.preset);
   });
   // opts (all optional) open this screen prefilled with custom variables:
-  // { title, tempo, reps, sets, rounds, rest, hold, backTo }.
+  // { title, tempo, reps, sets, rest, hold, backTo }.
   let presetRunName = null; // display/run name when it differs from the preset's
   function openPresetConfig(id, opts) {
     const d = MT.PRESET_DRILLS.find((x) => x.id === id);
@@ -735,12 +738,11 @@
     presetRunName = opts.title || null;
     $("#preset-title").textContent = opts.title || MT.presetName(d);
     renderLevelSeg("#preset-cfg-level");
-    fillTempoSelect($("#preset-tempo"), opts.tempo != null ? opts.tempo : levelTempo(d.tempo), "", MT.DRILL_TEMPOS);
+    fillTempoSelect($("#preset-tempo"), opts.tempo != null ? opts.tempo : levelTempo(d), "", MT.DRILL_TEMPOS);
     renderPresetSoundChips();
     $("#preset-reps").value = opts.reps != null ? opts.reps : d.reps;
     $("#preset-sets").value = opts.sets != null ? opts.sets : d.sets;
     $("#preset-rest").value = opts.rest != null ? opts.rest : d.rest;
-    $("#preset-rounds").value = opts.rounds != null ? opts.rounds : 1;
     // Kick hold — only makes sense on the kicking (ground) drills.
     $("#preset-hold-wrap").hidden = !d.kick;
     fillHoldSelect($("#preset-hold"), opts.hold || 0);
@@ -753,20 +755,18 @@
   function updatePresetEst() {
     const el = $("#preset-est");
     if (!el || !presetDrill) return;
-    const setsPerRound = Math.max(1, Number($("#preset-sets").value) || 1);
-    const rounds = Math.max(1, Number($("#preset-rounds").value) || 1);
     const t = MT.estimateSession({
       kind: "drill",
       items: [
         MT.drillToItem({
           name: presetRunName || MT.presetName(presetDrill),
           reps: Math.max(1, Number($("#preset-reps").value) || 1),
-          duration: Number($("#preset-tempo").value) || levelTempo(presetDrill.tempo),
+          duration: Number($("#preset-tempo").value) || levelTempo(presetDrill),
           hold: presetHold(),
           sound: presetSound,
         }),
       ],
-      sets: setsPerRound * rounds,
+      sets: Math.max(1, Number($("#preset-sets").value) || 1),
       restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
     });
     el.textContent = "Est. total: ~" + MT.fmtTime(t);
@@ -779,13 +779,12 @@
   $("#preset-reps").addEventListener("input", updatePresetEst);
   $("#preset-sets").addEventListener("input", updatePresetEst);
   $("#preset-rest").addEventListener("input", updatePresetEst);
-  $("#preset-rounds").addEventListener("input", updatePresetEst);
   $("#preset-cfg-level").addEventListener("click", (e) => {
     const b = e.target.closest("[data-level]");
     if (!b || !presetDrill) return;
     presetLevel = b.dataset.level;
     renderLevelSeg("#preset-cfg-level");
-    $("#preset-tempo").value = levelTempo(presetDrill.tempo);
+    $("#preset-tempo").value = levelTempo(presetDrill);
     updatePresetEst();
     refreshPreview("preset");
   });
@@ -793,8 +792,6 @@
     if (!presetDrill) return;
     MT.unlockAudio();
     const tempo = Number($("#preset-tempo").value);
-    const setsPerRound = Math.max(1, Number($("#preset-sets").value) || 1);
-    const rounds = Math.max(1, Number($("#preset-rounds").value) || 1);
     startRun({
       kind: "drill",
       items: [
@@ -806,96 +803,182 @@
           sound: presetSound,
         }),
       ],
-      sets: setsPerRound * rounds,
-      setsPerRound,
-      rounds,
+      sets: Math.max(1, Number($("#preset-sets").value) || 1),
       restSeconds: Math.max(0, Number($("#preset-rest").value) || 0),
       tempoLabel: tempo.toFixed(1) + "s / rep",
     });
   });
 
-  /* -------------------- KOREAN COUNTING builder -------------------- */
-  let countLevel = "comp";
-  let countInterval = 2.0;
-  const countDelta = () =>
-    (MT.COUNT_LEVELS.find((l) => l.id === countLevel) || {}).delta || 0;
-  // Level moves the interval only; snap to the 0.1s grid the select uses.
+  /* -------------------- KOREAN COUNTING builder --------------------
+     Two modes. Custom Counting runs the team's kick & stance drills: tick
+     the drills, give each its sets, and the app announces each one, counts
+     it up to the target at its own interval (black belt defaults, Color
+     Belts +0.5s) and closes every set with a soft chime. General Counting
+     is plain counting at a typed interval — no presets. */
+  let countMode = "custom";
+  let countLevel = "black";
+  let countSection = "kicks";
+  let countOrder = "order";
+  // Per-drill choices, kept while switching level/section:
+  // { on, sets, tempo } — tempo is a typed override at the current level,
+  // cleared when the level changes so the new defaults show.
+  const countCfg = {};
+  const countDelta = () => (MT.COUNT_LEVELS.find((l) => l.id === countLevel) || {}).delta || 0;
   const countTempo = (base) => Math.max(0.1, Math.round((base + countDelta()) * 10) / 10);
+  const cfgFor = (d) => countCfg[d.id] || (countCfg[d.id] = { on: false, sets: 2, tempo: null });
+  const drillTempo = (d) => {
+    const c = cfgFor(d);
+    return c.tempo != null ? c.tempo : countTempo(d.tempo);
+  };
+  // Drills on screen at this level/section (hook kicks are black belt only).
+  const visibleCountDrills = () =>
+    MT.COUNT_DRILLS.filter((d) => d.section === countSection && !(d.blackOnly && countLevel !== "black"));
+  const chosenCountDrills = () => visibleCountDrills().filter((d) => cfgFor(d).on);
+
   function renderCountBuilder() {
-    renderCountLevelSeg();
-    renderCountChips();
-    fillTempoSelect($("#count-custom"), countInterval, "", MT.DRILL_TEMPOS);
+    $$("#count-mode .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.cmode === countMode));
+    $("#count-custom-block").classList.toggle("hidden", countMode !== "custom");
+    $("#count-general-block").classList.toggle("hidden", countMode !== "general");
+    $("#start-count").textContent = countMode === "custom" ? "Start Drills" : "Start Counting";
+    $("#count-level").innerHTML = MT.COUNT_LEVELS.map(
+      (l) => `<button class="seg-btn ${l.id === countLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
+    ).join("");
+    $$("#count-section .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.csection === countSection));
+    $$("#count-order .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.corder === countOrder));
+    renderCountDrills();
     updateCountEst();
+  }
+  function renderCountDrills() {
+    const row = (d) => {
+      const c = cfgFor(d);
+      return `
+      <div class="check-item count-row">
+        <label class="cr-main">
+          <input type="checkbox" data-cd="${d.id}" ${c.on ? "checked" : ""} />
+          <span class="ci-name">${d.name}</span>
+        </label>
+        <span class="count-vars">
+          <input type="number" inputmode="decimal" step="0.1" min="0.1" max="30" value="${drillTempo(d).toFixed(1)}" data-cd-tempo="${d.id}" aria-label="Seconds between counts" /><span class="cv-unit">s</span>
+          <input type="number" inputmode="numeric" min="1" max="20" value="${c.sets}" data-cd-sets="${d.id}" aria-label="Sets" /><span class="cv-unit">sets</span>
+        </span>
+      </div>`;
+    };
+    // Stance drills sit under a stance heading, like the preset list.
+    const groups = [];
+    visibleCountDrills().forEach((d) => {
+      const key = d.stance || "";
+      let g = groups.find((x) => x.name === key);
+      if (!g) groups.push((g = { name: key, drills: [] }));
+      g.drills.push(d);
+    });
+    $("#count-drills").innerHTML = groups
+      .map(
+        (g) => `
+      <div class="stance-group">
+        ${g.name ? `<h3 class="stance-head">${g.name}</h3>` : ""}
+        <div class="checklist">${g.drills.map(row).join("")}</div>
+      </div>`
+      )
+      .join("");
+  }
+  // The session the Start button would run right now (drills in list order;
+  // Random shuffles at start).
+  function countSession() {
+    if (countMode === "general") {
+      const interval = Math.max(0.1, Number($("#count-interval").value) || 2);
+      return {
+        kind: "count",
+        target: Math.max(1, Number($("#gcount-target").value) || 10),
+        drills: [{ name: "Counting", interval, sets: Math.max(1, Number($("#gcount-sets").value) || 1) }],
+        restSeconds: Math.max(0, Number($("#gcount-rest").value) || 0),
+        tempoLabel: interval.toFixed(1) + "s / count",
+      };
+    }
+    return {
+      kind: "count",
+      target: Math.max(1, Number($("#count-target").value) || 10),
+      drills: chosenCountDrills().map((d) => ({
+        name: MT.countDrillName(d),
+        say: d.say,
+        interval: drillTempo(d),
+        sets: Math.max(1, cfgFor(d).sets || 1),
+      })),
+      restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
+    };
   }
   function updateCountEst() {
     const el = $("#count-est");
     if (!el) return;
-    const t = MT.estimateSession({
-      kind: "count",
-      target: Math.max(1, Number($("#count-target").value) || 10),
-      interval: countInterval,
-      sets: Math.max(1, Number($("#count-sets").value) || 1),
-      restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
-    });
-    el.textContent = "Est. total: ~" + MT.fmtTime(t);
+    const s = countSession();
+    if (!s.drills.length) {
+      el.textContent = "Tick at least one drill to see a total time.";
+      return;
+    }
+    el.textContent = "Est. total: ~" + MT.fmtTime(MT.estimateSession(s));
   }
-  $("#count-target").addEventListener("input", updateCountEst);
-  $("#count-sets").addEventListener("input", updateCountEst);
-  $("#count-rest").addEventListener("input", updateCountEst);
-  function renderCountLevelSeg() {
-    $("#count-level").innerHTML = MT.COUNT_LEVELS.map(
-      (l) =>
-        `<button class="seg-btn ${l.id === countLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
-    ).join("");
-  }
-  function renderCountChips() {
-    $("#count-intervals").innerHTML = MT.COUNT_INTERVALS.map(
-      (i) =>
-        `<button class="sound-chip ${Math.abs(countTempo(i.v) - countInterval) < 0.001 ? "active" : ""}" data-int="${i.v}">${countTempo(i.v).toFixed(1)}s · ${i.label}</button>`
-    ).join("");
-  }
+  $("#count-mode").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-cmode]");
+    if (!b) return;
+    countMode = b.dataset.cmode;
+    stopPreview();
+    renderCountBuilder();
+  });
   $("#count-level").addEventListener("click", (e) => {
     const b = e.target.closest("[data-level]");
     if (!b) return;
-    // If a preset chip is active, keep it selected at the new level's tempo.
-    const preset = MT.COUNT_INTERVALS.find(
-      (i) => Math.abs(countTempo(i.v) - countInterval) < 0.001
-    );
     countLevel = b.dataset.level;
-    if (preset) {
-      countInterval = countTempo(preset.v);
-      $("#count-custom").value = countInterval;
-    }
-    renderCountLevelSeg();
-    renderCountChips();
-    updateCountEst();
-    refreshPreview("count");
+    Object.keys(countCfg).forEach((k) => (countCfg[k].tempo = null)); // back to the level's defaults
+    renderCountBuilder();
   });
-  $("#count-intervals").addEventListener("click", (e) => {
-    const chip = e.target.closest("[data-int]");
-    if (!chip) return;
-    countInterval = countTempo(Number(chip.dataset.int));
-    renderCountChips();
-    $("#count-custom").value = countInterval;
-    updateCountEst();
-    refreshPreview("count");
+  $("#count-section").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-csection]");
+    if (!b) return;
+    countSection = b.dataset.csection;
+    renderCountBuilder();
   });
-  $("#count-custom").addEventListener("change", (e) => {
-    countInterval = Number(e.target.value);
-    renderCountChips(); // active chip follows only if it matches a preset
+  $("#count-order").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-corder]");
+    if (!b) return;
+    countOrder = b.dataset.corder;
+    renderCountBuilder();
+  });
+  // Ticks, tempos and set counts edit the config in place — no re-render, so
+  // a field keeps focus while it's being typed in.
+  $("#count-drills").addEventListener("change", (e) => {
+    const cb = e.target.closest("[data-cd]");
+    if (!cb) return;
+    const d = MT.COUNT_DRILLS.find((x) => x.id === cb.dataset.cd);
+    if (d) cfgFor(d).on = cb.checked;
+    updateCountEst();
+  });
+  $("#count-drills").addEventListener("input", (e) => {
+    const t = e.target.closest("[data-cd-tempo]");
+    const s = e.target.closest("[data-cd-sets]");
+    if (!t && !s) return;
+    const d = MT.COUNT_DRILLS.find((x) => x.id === (t || s).dataset[t ? "cdTempo" : "cdSets"]);
+    if (!d) return;
+    if (t) cfgFor(d).tempo = Number(t.value) > 0 ? Math.round(Number(t.value) * 10) / 10 : null;
+    else cfgFor(d).sets = Math.max(1, Math.min(20, Math.round(Number(s.value) || 1)));
+    updateCountEst();
+  });
+  ["#count-target", "#count-rest", "#gcount-target", "#gcount-sets", "#gcount-rest"].forEach((sel) =>
+    $(sel).addEventListener("input", updateCountEst)
+  );
+  $("#count-interval").addEventListener("input", () => {
     updateCountEst();
     refreshPreview("count");
   });
   $("#start-count").addEventListener("click", () => {
+    const s = countSession();
+    if (!s.drills.length) return alert("Tick at least one drill.");
+    if (countMode === "custom" && countOrder === "random") {
+      for (let i = s.drills.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [s.drills[i], s.drills[j]] = [s.drills[j], s.drills[i]];
+      }
+    }
     MT.unlockAudio();
-    startRun({
-      kind: "count",
-      target: Math.max(1, Number($("#count-target").value) || 10),
-      interval: countInterval,
-      sets: Math.max(1, Number($("#count-sets").value) || 1),
-      restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
-      tempoLabel: countInterval.toFixed(1) + "s / count",
-    });
+    startRun(s);
   });
 
   /* -------------------- POOMSAE DRILLS: INTRO -------------------- */
@@ -1150,8 +1233,17 @@
   let rzSection = "black";
   let rzDivision = "youth";
   let rzRank = "yellow";
+  let rzAfter = "announce"; // "announce" just says the name; "rhythm" runs the poomsae too
+  let rzBoost = 1;
 
+  function renderRzAfter() {
+    $$("#rz-after .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.after === rzAfter));
+    $("#rz-rhythm-wrap").hidden = rzAfter !== "rhythm";
+    renderBoostChips("#rz-boost", rzBoost);
+    $("#rz-go").innerHTML = rzAfter === "rhythm" ? "&#127922; Randomize &amp; Run" : "&#127922; Randomize";
+  }
   function renderRandomizer() {
+    renderRzAfter();
     $$("#rz-section .seg-btn").forEach((b) =>
       b.classList.toggle("active", b.dataset.section === rzSection)
     );
@@ -1197,6 +1289,18 @@
     rzRank = e.target.value;
     updateRzPool();
   });
+  $("#rz-after").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-after]");
+    if (!b) return;
+    rzAfter = b.dataset.after;
+    renderRzAfter();
+  });
+  $("#rz-boost").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-boost]");
+    if (!chip) return;
+    rzBoost = Number(chip.dataset.boost) || 1;
+    renderBoostChips("#rz-boost", rzBoost);
+  });
   $("#rz-go").addEventListener("click", () => {
     const forms = MT.loadForms();
     const key = rzSection === "black" ? rzDivision : rzRank;
@@ -1207,8 +1311,18 @@
     if (!f) return;
     $("#rz-num").textContent = f.id;
     $("#rz-name").textContent = f.name;
-    // Announce the poomsae name (respects the voice on/off setting).
     MT.unlockAudio();
+    // Play the rhythm: the full poomsae flow on the run screen (it announces
+    // the name itself), at the division's rhythm plus any speed boost.
+    if (rzAfter === "rhythm") {
+      const items = MT.buildFormItems(
+        { mode: "pick", ids: [f.id], section: rzSection, division: rzSection === "black" ? rzDivision : "", boost: rzBoost },
+        forms
+      );
+      startRun({ items, sets: 1, restSeconds: 0, tempoLabel: boostLabel(rzBoost) });
+      return;
+    }
+    // Announce the poomsae name (respects the voice on/off setting).
     if (MT.loadSettings().voice) MT.speak(f.spoken || f.name);
     // quick pop animation
     const card = $("#rz-name").closest(".rz-result");
@@ -1233,6 +1347,7 @@
     countdown: "Ready",
     switch: "Switch",
     relax: "Suh",
+    setdone: "Set complete",
     done: "", // session over — checkmark only, no wording
   };
 
@@ -1328,17 +1443,13 @@
       onItem(info) {
         estLeft = MT.estimateRemaining(session, info);
         estAnchor = MT.now();
-        // Preset drills run rounds × sets; show both when rounds are in play.
-        const spr = session.setsPerRound;
         if (session.kind === "pdrill") {
           elSet.textContent = `Rep ${info.set} / ${info.sets}`;
-        } else if (spr && session.rounds > 1) {
-          const round = Math.ceil(info.set / spr);
-          const setIn = ((info.set - 1) % spr) + 1;
-          elSet.textContent = `Round ${round}/${session.rounds} · Set ${setIn}/${spr}`;
         } else {
           elSet.textContent = `Set ${info.set} / ${info.sets}`;
         }
+        // Counting drills each run at their own interval — show the current one.
+        if (info.tempo) $("#run-tempo").textContent = info.tempo;
         elItem.textContent =
           info.items > 1 ? `${info.item} / ${info.items}` : "";
         elTitle.textContent = poomTitle(info.name, info.id);
@@ -1347,6 +1458,7 @@
       onPhase(phase, label, num) {
         document.body.dataset.phase = phase;
         elPhase.textContent = PHASE_LABELS[phase] || label;
+        if (phase === "announce" && session.kind === "count") elPhase.textContent = "Next Drill";
         // The bar is scrubbable only during the performance ("go") phase.
         // Counting sessions can't seek (speech-driven), so no thumb there.
         const seekable = phase === "go" && session.kind !== "count";
@@ -1379,6 +1491,8 @@
           elMax.textContent = "downloading the recording";
         } else if (phase === "go") {
           elCount.textContent = "1";
+        } else if (phase === "setdone") {
+          elMax.textContent = "set complete"; // the big number stays on the last count
         } else if (phase === "done") {
           // Session over: just the big checkmark, no wording.
           elPhase.textContent = "";
