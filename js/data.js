@@ -127,7 +127,10 @@
     { id: "s-tiger-f", section: "stances", stance: "Tiger Stance", name: "Step forward, hold, step back", say: "Tiger stance, step forward first", tempo: 2.0 },
     { id: "s-horse-1", section: "stances", stance: "Horse Stance", name: "One side at a time",            say: "Horse stance, one side at a time", tempo: 2.0 },
     { id: "s-horse-2", section: "stances", stance: "Horse Stance", name: "Side to side",                  say: "Horse stance, side to side",       tempo: 3.5 },
-    { id: "s-crane",   section: "stances", name: "Crane Stance",                                          say: "Crane stance",                     tempo: 8.0 },
+    // Crane is the one held stance: Sijak, then a fixed 8-count in Korean
+    // (1s per count at black belt), chime on the 8th. `count` overrides the
+    // screen's "Count up to"; `cue` swaps the opening Joonbi for Sijak.
+    { id: "s-crane",   section: "stances", name: "Crane Stance · 8-count hold",                           say: "Crane stance",                     tempo: 1.0, count: 8, cue: "sijak" },
   ];
   // Full drill name — "Front Stance · Step back, hold, step forward".
   MT.countDrillName = (d) => (d.stance ? d.stance + " · " + d.name : d.name);

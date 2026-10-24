@@ -377,8 +377,11 @@
   }
 
   /* ---- Korean Counting: spoken Korean counting, one or more drills in a
-     row. session.drills = [{ name, say, interval, sets }]; each drill runs
-     all of its own sets before the next one starts.
+     row. session.drills = [{ name, say, interval, sets, count?, cue? }];
+     each drill runs all of its own sets before the next one starts. A drill
+     with `count` counts to that instead of the session target, and `cue`
+     "sijak" opens its sets with Sijak instead of Joonbi (the Crane stance
+     hold: Sijak → 8 counts → chime).
      First drill: [announce] → 3-2-1 → Joonbi → count 1..target (decade
      style: 11→둘, 21→셋 …) at the drill's interval → soft set chime → rest
      with spoken countdown → Joonbi → next set. A new drill is announced
@@ -408,9 +411,11 @@
           tempo: d.interval.toFixed(1) + "s / count",
         });
         const first = di === 0 && s === 0;
+        const cue = d.cue === "sijak" ? "sijak" : "joonbi";
+        const target = d.count > 0 ? d.count : session.target;
         if (s === 0) {
           // New drill: rest first (not before the very first), then say its
-          // name so athletes know what's coming, then Joonbi.
+          // name so athletes know what's coming, then the opening cue.
           if (!first) await drillRest(session.restSeconds, player, cb, settings, "none");
           if (player.cancelled) return;
           if (d.say && !stopped(player)) {
@@ -418,28 +423,30 @@
             await say(d.say, player, settings, ANNOUNCE_OPTS);
             await wait(GAP, player);
           }
-          if (first) await drillCountdown(player, cb, settings, "joonbi");
+          if (first) await drillCountdown(player, cb, settings, cue);
           else if (!stopped(player)) {
-            cb.onPhase("joonbi", "Joonbi");
-            await say(MT.CUES.joonbi.say, player, settings, STYLE.joonbi);
+            cb.onPhase(cue, cue === "sijak" ? "Sijak" : "Joonbi");
+            await say(MT.CUES[cue].say, player, settings, STYLE[cue]);
           }
         } else {
-          await drillRest(session.restSeconds, player, cb, settings, "joonbi");
+          await drillRest(session.restSeconds, player, cb, settings, cue);
         }
         if (player.cancelled) return;
         cb.onPhase("go", d.name);
-        // First count comes a fixed 1s after "Joonbi" (drills use their tempo).
+        // First count comes a fixed 1s after the cue (drills use their tempo).
         await wait(1, player);
-        for (let n = 1; n <= session.target; n++) {
+        for (let n = 1; n <= target; n++) {
           if (stopped(player)) break;
-          cb.onCount(n, session.target);
-          cb.onProgress(n / session.target);
+          cb.onCount(n, target);
+          cb.onProgress(n / target);
           if (settings.voice) MT.speak(MT.countWord(n), { rate: 1.0 }); // fire-and-forget: keeps the interval steady
           await wait(d.interval, player);
         }
         if (player.cancelled) return;
         const last = di === drills.length - 1 && s === d.sets - 1;
-        if (!last && !player.skip) {
+        // A held count (Crane) always gets its release chime, even on the
+        // final set — the big bell follows it.
+        if ((!last || d.count > 0) && !player.skip) {
           cb.onPhase("setdone", "Set complete");
           MT.playSetChime();
           await wait(SET_CHIME, player);
@@ -981,9 +988,9 @@
         } else {
           t += session.restSeconds + joonbi;
         }
-        t += 1 + session.target * d.interval;
+        t += 1 + (d.count > 0 ? d.count : session.target) * d.interval;
         const last = di === drills.length - 1 && s === d.sets - 1;
-        t += last ? 2.4 : SET_CHIME;
+        t += last ? 2.4 + (d.count > 0 ? SET_CHIME : 0) : SET_CHIME;
       }
     }
     return t;

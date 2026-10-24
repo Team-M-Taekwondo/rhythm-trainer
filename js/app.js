@@ -220,7 +220,7 @@
         // A fresh landing from the Drills hub starts at the Standing/Ground
         // chooser; coming back from a config screen keeps the open group.
         const cur = document.querySelector(".screen.active");
-        if (cur && cur.dataset.screen === "drills") presetGroup = null;
+        if (cur && cur.dataset.screen === "drills") presetGroup = presetStance = null;
         renderPresetList();
       }
       if (dest === "build-count") renderCountBuilder();
@@ -604,6 +604,7 @@
   let presetDrill = null; // the preset opened on the config screen
   let presetSound = "drum";
   let presetGroup = null; // which drill group is open — null shows the chooser
+  let presetStance = null; // Standing drills: which stance is open — null shows the stance cards
 
   function renderPresetSoundChips() {
     $("#preset-sound-chips").innerHTML = MT.SOUNDS.map(
@@ -657,9 +658,33 @@
       </div>`;
       return;
     }
+    // Standing drills: pick the stance first, so one screen never lists
+    // every stance's drills at once.
+    const stances = [];
+    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup && d.stance).forEach((d) => {
+      let s = stances.find((x) => x.name === d.stance);
+      if (!s) stances.push((s = { name: d.stance, drills: [] }));
+      s.drills.push(d);
+    });
+    if (stances.length && !presetStance) {
+      $("#preset-level").closest(".panel").hidden = true;
+      $("#preset-list").innerHTML = `
+      <div class="home-grid">
+        ${stances
+          .map(
+            (s) => `
+        <button class="card big" data-pstance="${s.name}">
+          <span class="card-title">${s.name}</span>
+          <span class="card-sub">${s.drills.map((d) => d.name).join(" &middot; ")}</span>
+        </button>`
+          )
+          .join("")}
+      </div>`;
+      return;
+    }
     renderLevelSeg("#preset-level");
     const groups = [];
-    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup).forEach((d) => {
+    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup && (!presetStance || d.stance === presetStance)).forEach((d) => {
       let g = groups.find((x) => x.name === d.group);
       if (!g) groups.push((g = { name: d.group, drills: [] }));
       g.drills.push(d);
@@ -686,7 +711,7 @@
               .map(
                 (s) => `
             <div class="stance-group">
-              ${s.name ? `<h3 class="stance-head">${s.name}</h3>` : ""}
+              ${s.name && !presetStance ? `<h3 class="stance-head">${s.name}</h3>` : ""}
               <div class="checklist">${s.drills.map(row).join("")}</div>
             </div>`
               )
@@ -694,7 +719,7 @@
           : `<p class="hint">No drills here yet.</p>`;
         return `
       <div class="panel">
-        <h2>${g.name}</h2>
+        <h2>${presetStance ? presetStance : g.name}</h2>
         ${rows}
       </div>`;
       })
@@ -706,11 +731,13 @@
     presetLevel = b.dataset.level;
     renderPresetList();
   });
-  // The topbar back arrow steps the flow back: group view → chooser first;
-  // on the chooser it falls through to its data-goto (the Drills hub).
+  // The topbar back arrow steps the flow back one layer: drills → stance
+  // cards → group chooser; on the chooser it falls through to its data-goto
+  // (the Drills hub).
   $('.screen[data-screen="preset-drills"] .topbar .icon-btn').addEventListener("click", (e) => {
     if (!presetGroup) return;
-    presetGroup = null;
+    if (presetStance) presetStance = null;
+    else presetGroup = null;
     renderPresetList();
     window.scrollTo(0, 0);
     e.stopPropagation(); // keep the data-goto router from leaving the screen
@@ -719,6 +746,14 @@
     const grp = e.target.closest("[data-pgroup]");
     if (grp) {
       presetGroup = grp.dataset.pgroup;
+      presetStance = null;
+      renderPresetList();
+      window.scrollTo(0, 0);
+      return;
+    }
+    const st = e.target.closest("[data-pstance]");
+    if (st) {
+      presetStance = st.dataset.pstance;
       renderPresetList();
       window.scrollTo(0, 0);
       return;
@@ -902,6 +937,8 @@
         say: d.say,
         interval: drillTempo(d),
         sets: Math.max(1, cfgFor(d).sets || 1),
+        count: d.count || 0, // Crane: fixed 8-count hold
+        cue: d.cue || "joonbi",
       })),
       restSeconds: Math.max(0, Number($("#count-rest").value) || 0),
     };
