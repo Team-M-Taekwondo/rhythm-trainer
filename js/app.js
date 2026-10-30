@@ -629,8 +629,21 @@
         `<button class="seg-btn ${l.id === presetLevel ? "active" : ""}" data-level="${l.id}">${l.label}</button>`
     ).join("");
   }
+  // Black-only presets (Crane) drop out of the list at Color Belt level.
+  const presetVisible = (d) => !(d.blackOnly && presetLevel !== "black");
+  // Counted presets (Crane) run on the Korean Counting engine instead of the
+  // metronome: Sijak, then 하나…일곱 at 1s, soft chime on the 8th second.
+  function countedPresetSession(d, sets, rest) {
+    return {
+      kind: "count",
+      target: d.reps,
+      drills: [{ name: MT.presetName(d), say: d.say, interval: d.tempo, sets, count: d.reps, cue: "sijak" }],
+      restSeconds: rest,
+    };
+  }
   // Total run time of a preset at the current level (as listed).
   function presetEstimate(d, tempo) {
+    if (d.counted) return MT.estimateSession(countedPresetSession(d, d.sets, d.rest));
     return MT.estimateSession({
       kind: "drill",
       items: [MT.drillToItem({ name: MT.presetName(d), reps: d.reps, duration: tempo, sound: "drum" })],
@@ -661,11 +674,13 @@
     // Standing drills: pick the stance first, so one screen never lists
     // every stance's drills at once.
     const stances = [];
-    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup && d.stance).forEach((d) => {
+    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup && d.stance && presetVisible(d)).forEach((d) => {
       let s = stances.find((x) => x.name === d.stance);
       if (!s) stances.push((s = { name: d.stance, drills: [] }));
       s.drills.push(d);
     });
+    // Switched to Color Belts while a black-only stance was open: back to the cards.
+    if (presetStance && !stances.some((s) => s.name === presetStance)) presetStance = null;
     if (stances.length && !presetStance) {
       $("#preset-level").closest(".panel").hidden = true;
       $("#preset-list").innerHTML = `
@@ -684,7 +699,7 @@
     }
     renderLevelSeg("#preset-level");
     const groups = [];
-    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup && (!presetStance || d.stance === presetStance)).forEach((d) => {
+    MT.PRESET_DRILLS.filter((d) => d.group === presetGroup && presetVisible(d) && (!presetStance || d.stance === presetStance)).forEach((d) => {
       let g = groups.find((x) => x.name === d.group);
       if (!g) groups.push((g = { name: d.group, drills: [] }));
       g.drills.push(d);
@@ -695,7 +710,11 @@
         const row = (d) => `
             <button class="preset-row" data-preset="${d.id}">
               <span class="pr-name">${d.name}</span>
-              <span class="pr-meta">${levelTempo(d).toFixed(1)}s tempo · ${d.reps} reps · ${d.sets} sets · ${d.rest}s rest · ~${MT.fmtTime(presetEstimate(d, levelTempo(d)))}</span>
+              <span class="pr-meta">${
+                d.counted
+                  ? `Sijak · ${d.reps} counts, chime on ${d.reps + 1}`
+                  : `${levelTempo(d).toFixed(1)}s tempo · ${d.reps} reps`
+              } · ${d.sets} sets · ${d.rest}s rest · ~${MT.fmtTime(presetEstimate(d, levelTempo(d)))}</span>
             </button>`;
         // Rows sit under a stance heading (Horse Stance, Front Stance…) so the
         // right drill is quick to find; drills without a stance list plainly.
@@ -780,6 +799,12 @@
     $("#preset-rest").value = opts.rest != null ? opts.rest : d.rest;
     // Kick hold — only makes sense on the kicking (ground) drills.
     $("#preset-hold-wrap").hidden = !d.kick;
+    // Counted presets (Crane) are a fixed count — only sets and rest apply.
+    const counted = !!d.counted;
+    $("#preset-cfg-level").closest(".panel").hidden = counted;
+    $("#preset-tempo").closest(".field").hidden = counted;
+    $("#preset-sound-chips").closest(".field").hidden = counted;
+    $("#preset-reps").closest(".field").hidden = counted;
     fillHoldSelect($("#preset-hold"), opts.hold || 0);
     setBackButton("preset-config", opts.backTo || "preset-drills");
     updatePresetEst();
@@ -790,6 +815,12 @@
   function updatePresetEst() {
     const el = $("#preset-est");
     if (!el || !presetDrill) return;
+    const sets = Math.max(1, Number($("#preset-sets").value) || 1);
+    const rest = Math.max(0, Number($("#preset-rest").value) || 0);
+    if (presetDrill.counted) {
+      el.textContent = "Est. total: ~" + MT.fmtTime(MT.estimateSession(countedPresetSession(presetDrill, sets, rest)));
+      return;
+    }
     const t = MT.estimateSession({
       kind: "drill",
       items: [
@@ -826,6 +857,16 @@
   $("#start-preset").addEventListener("click", () => {
     if (!presetDrill) return;
     MT.unlockAudio();
+    if (presetDrill.counted) {
+      startRun(
+        countedPresetSession(
+          presetDrill,
+          Math.max(1, Number($("#preset-sets").value) || 1),
+          Math.max(0, Number($("#preset-rest").value) || 0)
+        )
+      );
+      return;
+    }
     const tempo = Number($("#preset-tempo").value);
     startRun({
       kind: "drill",
@@ -845,7 +886,7 @@
   });
 
   /* -------------------- KOREAN COUNTING builder --------------------
-     Two modes. Custom Counting runs the team's kick & stance drills: tick
+     Two modes. Preset Counting (countMode "custom") runs the team's kick & stance drills: tick
      the drills, give each its sets, and the app announces each one, counts
      it up to the target at its own interval (black belt defaults, Color
      Belts +0.5s) and closes every set with a soft chime. General Counting

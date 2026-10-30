@@ -86,6 +86,9 @@
     { id: "ts-stat",   group: "Standing drills", stance: "Tiger Stance", name: "Stationary · Blocks/Attacks", tempo: 1.5, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
     { id: "ts-block",  group: "Standing drills", stance: "Tiger Stance", name: "Forward/Back · Blocks",       tempo: 1.7, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
     { id: "ts-attack", group: "Standing drills", stance: "Tiger Stance", name: "Forward/Back · Attacks",      tempo: 1.5, reps: 20, rest: 10, sets: 4, colorDelta: 0.5 },
+    // Crane (Black Belts only) isn't a metronome drill: `counted` runs it on
+    // the Korean Counting engine — Sijak, 하나…일곱 at 1s, chime on the 8th.
+    { id: "crane",     group: "Standing drills", stance: "Crane Stance", name: "7-count hold", say: "Crane stance", tempo: 1.0, reps: 7, rest: 10, sets: 2, blackOnly: true, counted: true },
   ];
   // Full drill name — "Front Stance · Forward/Back · Blocks".
   MT.presetName = (d) => (d.stance ? d.stance + " · " + d.name : d.name);
@@ -119,18 +122,18 @@
     { id: "k-round2", section: "kicks", name: "2 Round House", say: "Two round house", tempo: 5.5 },
     { id: "k-side2",  section: "kicks", name: "2 Side Kicks",  say: "Two side kicks",  tempo: 6.5 },
     { id: "k-hook2",  section: "kicks", name: "2 Hook Kicks",  say: "Two hook kicks",  tempo: 7.0, blackOnly: true },
-    { id: "s-front-b", section: "stances", stance: "Front Stance", name: "Step back, hold, step forward", say: "Front stance, step back first",    tempo: 2.0 },
-    { id: "s-front-f", section: "stances", stance: "Front Stance", name: "Step forward, hold, step back", say: "Front stance, step forward first", tempo: 2.0 },
-    { id: "s-back-b",  section: "stances", stance: "Back Stance",  name: "Step back, hold, step forward", say: "Back stance, step back first",     tempo: 2.0 },
-    { id: "s-back-f",  section: "stances", stance: "Back Stance",  name: "Step forward, hold, step back", say: "Back stance, step forward first",  tempo: 2.0 },
-    { id: "s-tiger-b", section: "stances", stance: "Tiger Stance", name: "Step back, hold, step forward", say: "Tiger stance, step back first",    tempo: 2.0 },
-    { id: "s-tiger-f", section: "stances", stance: "Tiger Stance", name: "Step forward, hold, step back", say: "Tiger stance, step forward first", tempo: 2.0 },
+    { id: "s-front-b", section: "stances", stance: "Front Stance", name: "Step back, hold, step forward", say: "Front stance, back and forward", tempo: 2.0 },
+    { id: "s-front-f", section: "stances", stance: "Front Stance", name: "Step forward, hold, step back", say: "Front stance, forward and back", tempo: 2.0 },
+    { id: "s-back-b",  section: "stances", stance: "Back Stance",  name: "Step back, hold, step forward", say: "Back stance, back and forward",  tempo: 2.0 },
+    { id: "s-back-f",  section: "stances", stance: "Back Stance",  name: "Step forward, hold, step back", say: "Back stance, forward and back",  tempo: 2.0 },
+    { id: "s-tiger-b", section: "stances", stance: "Tiger Stance", name: "Step back, hold, step forward", say: "Tiger stance, back and forward", tempo: 2.0 },
+    { id: "s-tiger-f", section: "stances", stance: "Tiger Stance", name: "Step forward, hold, step back", say: "Tiger stance, forward and back", tempo: 2.0 },
     { id: "s-horse-1", section: "stances", stance: "Horse Stance", name: "One side at a time",            say: "Horse stance, one side at a time", tempo: 2.0 },
     { id: "s-horse-2", section: "stances", stance: "Horse Stance", name: "Side to side",                  say: "Horse stance, side to side",       tempo: 3.5 },
-    // Crane is the one held stance: Sijak, then a fixed 8-count in Korean
-    // (1s per count at black belt), chime on the 8th. `count` overrides the
-    // screen's "Count up to"; `cue` swaps the opening Joonbi for Sijak.
-    { id: "s-crane",   section: "stances", name: "Crane Stance · 8-count hold",                           say: "Crane stance",                     tempo: 1.0, count: 8, cue: "sijak" },
+    // Crane is the one held stance (Black Belts only): Sijak, then 하나…일곱
+    // at 1s each, and the soft chime lands on the 8th second. `count`
+    // overrides the screen's "Count up to"; `cue` swaps Joonbi for Sijak.
+    { id: "s-crane",   section: "stances", name: "Crane Stance · 7-count hold",                           say: "Crane stance",                     tempo: 1.0, count: 7, cue: "sijak", blackOnly: true },
   ];
   // Full drill name — "Front Stance · Step back, hold, step forward".
   MT.countDrillName = (d) => (d.stance ? d.stance + " · " + d.name : d.name);

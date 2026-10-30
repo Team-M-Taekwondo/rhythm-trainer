@@ -381,14 +381,15 @@
      each drill runs all of its own sets before the next one starts. A drill
      with `count` counts to that instead of the session target, and `cue`
      "sijak" opens its sets with Sijak instead of Joonbi (the Crane stance
-     hold: Sijak → 8 counts → chime).
+     hold: Sijak → 7 counts → chime on the 8th second).
      First drill: [announce] → 3-2-1 → Joonbi → count 1..target (decade
      style: 11→둘, 21→셋 …) at the drill's interval → soft set chime → rest
      with spoken countdown → Joonbi → next set. A new drill is announced
      after the rest, then Joonbi. The session ends on the big finish chime
      (no set chime and no rest after the final set). ---- */
   const SET_CHIME = 1.0; // seconds the set chime gets to ring before the rest
-  const ANNOUNCE_OPTS = { lang: "en-US", absolute: true, rate: 0.95 };
+  // Drill names are spoken a touch slower than the cues so they sound natural.
+  const ANNOUNCE_OPTS = { lang: "en-US", absolute: true, rate: 0.85 };
   function countDrills(session) {
     return session.drills && session.drills.length
       ? session.drills

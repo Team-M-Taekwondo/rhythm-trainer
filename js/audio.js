@@ -488,8 +488,10 @@
       u.onstart = function () { dlog('  ▶ start "' + text + '"'); };
       u.onend = function () { dlog('  ■ end "' + text + '"'); finish(); };
       u.onerror = function (e) { dlog("  ✕ error " + (e && e.error)); finish(); };
-      // safety: never hang the sequence if the engine drops the event
-      setTimeout(finish, 2500);
+      // safety: never hang the sequence if the engine drops the event. Longer
+      // phrases (drill announcements) get more time so the next cue doesn't
+      // start on top of them.
+      setTimeout(finish, Math.max(2500, (text.length * 100) / u.rate));
       ss.speak(u);
     });
   };
